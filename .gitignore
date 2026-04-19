@@ -1,0 +1,13 @@
+# Ignorar archivos de modelos pesados
+modelos/*.gguf
+
+# Ignorar entornos virtuales
+.venv/
+venv/
+
+# Ignorar archivos temporales de Python
+__pycache__/
+*.pyc
+
+# Ignorar los PDFs generados (opcional, si no quieres subirlos)
+*.pdf
