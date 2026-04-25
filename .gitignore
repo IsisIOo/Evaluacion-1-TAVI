@@ -9,5 +9,23 @@ venv/
 __pycache__/
 *.pyc
 
-# Ignorar los PDFs generados (opcional, si no quieres subirlos)
+# Ignorar los PDFs generados
 *.pdf
+
+# Python
+__pycache__/
+.venv/
+env/
+.env
+*.py[cod]
+
+# Node / Vue
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store

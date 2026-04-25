@@ -1,0 +1,1 @@
+# schema define la estructura de los datos que se esperan en las solicitudes y respuestas de la API

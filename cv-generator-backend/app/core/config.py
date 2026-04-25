@@ -1,0 +1,1 @@
+# lee el archivo .env y carga las variables de entorno para la configuración de la aplicación

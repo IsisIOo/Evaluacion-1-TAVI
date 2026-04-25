@@ -1,0 +1,1 @@
+# endpoint para manejar las solicitudes relacionadas con la generación de CVs

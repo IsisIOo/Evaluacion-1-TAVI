@@ -7,12 +7,18 @@ Aquí se irá subiendo el código y/o documentación necesaria para la evaluaci�
 ## Estado
 En desarrollo.
 
-## Paso a paso:
-1. Selección de kernel (esquina superior derecha)
-2. Seleccionar entornos de python
-3. Crear un entorno de python
-4. seleccionar -> Venv
-5. Seleccionar, idealmente, la 3.12.9 (desconozco si otra versión afecte en algo)
-6. chambear
+## Estructura
+- `/cv-generator-backend`: FastAPI + LangChain
+- `/cv-generator-frontend`: Vue 3 + Vuetify
 
-7. aaaaa
+## Requisitos
+- Python 3.14+
+- Node.js (versión LTS)
+- MongoDB (local o Atlas)
+
+## Instalación rápida
+1. **Backend:** `cd cv-generator-backend && pip install -r requirements.txt <- cuidado, escrito con pip freeze`
+2. **Frontend:** `cd cv-generator-frontend && npm install`
+
+## Correr FastAPI Backend
+uvicorn cv-generator-backend.app.main:app --reload

@@ -1,0 +1,1 @@
+# servicio para manejar la interacción con el modelo de lenguaje (LLM) y generar el contenido del CV a partir de la información del usuario
