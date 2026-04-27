@@ -1,0 +1,1 @@
+# inicializa los modelos y pipelines una sola vez para que estén disponibles en toda la aplicación 

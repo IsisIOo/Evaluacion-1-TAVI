@@ -17,7 +17,7 @@ En desarrollo.
 - MongoDB (local o Atlas)
 
 ## Instalación rápida
-1. **Backend:** `cd cv-generator-backend && pip install -r requirements.txt <- cuidado, escrito con pip freeze`
+1. **Backend:** `cd cv-generator-backend && pip install -r requirements.txt` <- cuidado, escrito con pip freeze
 2. **Frontend:** `cd cv-generator-frontend && npm install`
 
 ## Correr FastAPI Backend
