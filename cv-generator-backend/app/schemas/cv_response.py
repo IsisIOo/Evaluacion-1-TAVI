@@ -1,33 +1,39 @@
-# schema para definir la estructura de lo que se devuelve al frontend
 from pydantic import BaseModel, Field
 from typing import List
 
-# [Para Toto]: define aquí la estructura del JSON que el LLM debe generar
+class Personal(BaseModel):
+    nombre_completo: str = Field(..., description="Nombre completo del candidato")
+    profesion: str = Field(..., description="Profesión actual")
+    email: str = Field(..., description="Correo electrónico")
+    telefono: str = Field(..., description="Número de teléfono")
+    linkedin: str = Field(..., description="URL de LinkedIn")
+    rut: str = Field(..., description="RUT del candidato")
+    ciudad: str = Field(..., description="Ciudad de residencia")
 
-class ExperienciaLaboralSalida(BaseModel):
-    puesto_y_empresa: str = Field(..., description="Posición ocupada y nombre de la empresa")
-    resumen_logros: str = Field(..., description="Resumen profesional y mejorado por el LLM")
+class Perfil(BaseModel):
+    anios_experiencia: int = Field(..., description="Años totales de experiencia laboral")
+    experticia: str = Field(..., description="Breve descripción de la experticia")
+    propuesta_valor: str = Field(..., description="Resumen profesional o propuesta de valor")
 
-class FormacionAcademicaSalida(BaseModel):
-    grado_y_lugar: str = Field(..., description="Ejemplo: 'Ingeniería Informática - Universidad Nacional'")
+class Experiencia(BaseModel):
+    cargo: str = Field(..., description="Cargo ocupado")
+    empresa: str = Field(..., description="Nombre de la empresa")
+    pais: str = Field(..., description="País donde se realizó la experiencia")
+    periodo: str = Field(..., description="Periodo de tiempo trabajado")
+    descripcion: str = Field(..., description="Descripción de las funciones")
+    logros: str = Field(..., description="Logros alcanzados")
+
+class Formacion(BaseModel):
+    titulo: str = Field(..., description="Título obtenido")
+    institucion: str = Field(..., description="Institución educativa")
+    periodo: str = Field(..., description="Periodo de estudio")
 
 class CVResponse(BaseModel):
     """
-    Esquema del JSON final que el LLM debe generar y que el BFF enviará al frontend.
+    Esquema del JSON final que el backend enviará al frontend.
     """
-    encabezado: str = Field(
-        ..., 
-        description="Un breve perfil profesional o resumen atractivo generado a partir del nombre y la experiencia del usuario."
-    )
-    formacion_academica: List[FormacionAcademicaSalida] = Field(
-        ..., 
-        description="Lista de la formación académica redactada formalmente."
-    )
-    experiencia_laboral: List[ExperienciaLaboralSalida] = Field(
-        ..., 
-        description="Lista de las experiencias laborales con redacción profesional orientada a logros."
-    )
-    competencias_complementarias: List[str] = Field(
-        ..., 
-        description="Lista de habilidades (técnicas o blandas) extraídas de la información extra, formateadas como viñetas cortas."
-    )
+    personal: Personal
+    perfil: Perfil
+    experiencias: List[Experiencia]
+    formacion: List[Formacion]
+    habilidades: str = Field(..., description="Texto que resume las habilidades del usuario")
