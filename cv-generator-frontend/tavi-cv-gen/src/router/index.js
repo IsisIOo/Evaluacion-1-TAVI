@@ -2,6 +2,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import AboutView from '@/views/AboutView.vue'
 import FormView from '@/views/FormView.vue'
+import PdfView from '@/views/PdfView.vue'
 
 const routes = [
   {
@@ -18,7 +19,13 @@ const routes = [
     path: '/form',
     name: 'form',
     component: FormView
+  },
+  {
+    path: '/PDF',
+    name: 'pdf',
+    component: PdfView
   }
+
 ]
 
 const router = createRouter({
