@@ -66,19 +66,9 @@
             async getJson() {
                 this.loading = true;
                 try {
-                    //const cvdata = await PdfService.getCvJson();
+                    //const cvdata = await PdfService.generateCv();
 
                     //this.cvDat = cvdata.data;
-                    this.cvDat = {
-                        nombre: "Mateo",
-                        apellido: "Sánchez",
-                        telefono: "555-0199",
-                        email: "mateo@ejemplo.com",
-                        experiencia: [
-                            { puesto: "Ingeniero de Software", empresa: "Google" },
-                            { puesto: "Pasante", empresa: "Microsoft" }
-                        ]
-                    };
                     console.log("JSON recibido exitosamente", this.cvDat);
                 } 
                 catch(error){
@@ -97,28 +87,71 @@
 
                 return {
                     content: [
+                        // --- PERSONAL ---
                         {
-                            text: `${this.cvDat.nombre} ${this.cvDat.apellido}`, 
+                            text: this.cvDat.personal.nombre_completo,
                             style: 'header'
                         },
                         {
-                            text: `Teléfono: ${this.cvDat.telefono} | Email: ${this.cvDat.email}\n\n`,
-                            style: 'contact'
+                            text: this.cvDat.personal.profesion,
+                            style: 'subHeader'
+                        },
+                        { 
+                            text: `${this.cvDat.personal.email} | ${this.cvDat.personal.telefono} | ${this.cvDat.personal.ciudad}`, 
+                            style: 'contact' 
                         },
                         {
-                            text: 'Experiencia Laboral',
-                            style: 'sectionTitle'
+                            text: `LinkedIn: ${this.cvDat.personal.linkedin}`,
+                            style: 'contact', margin: [0, 0, 0, 10]
                         },
 
-                        this.cvDat.experiencia ? this.cvDat.experiencia.map(exp => ({
-                            text: `${exp.puesto} en ${exp.empresa}`,
+                        // --- PERFIL ---
+                        {
+                            text: 'Perfil Profesional',
+                            style: 'sectionTitle'
+                        },
+                        {
+                            text: this.cvDat.perfil.propuesta_valor,
+                            style: 'bodyText'
+                        },
+                        {
+                            text: `Años de experiencia: ${this.cvDat.perfil.anios_experiencia}`,
+                            margin: [0, 5, 0, 10]
+                        },
+                        {
+                            text: `Experticia: ${this.cvDat.perfil.experticia}`,
+                            style: 'bodyText'
+                        },
+
+                        // --- EXPERIENCIA ---
+                        { text: 'Experiencia Laboral', style: 'sectionTitle' },
+                        ...this.cvDat.experiencias.map(exp => ({
+                            stack: [
+                                { text: `${exp.cargo} - ${exp.empresa}`, bold: true },
+                                { text: `${exp.periodo} | ${exp.pais}`, italics: true, fontSize: 10 },
+                                { text: `Funciones: ${exp.descripcion}`, margin: [0, 2, 0, 0] },
+                                { text: `Logros: ${exp.logros}`, margin: [0, 0, 0, 10] }
+                            ],
                             margin: [0, 5, 0, 5]
-                        })) : []
+                        })),
+
+                        // --- FORMACIÓN ---
+                        { text: 'Formación Académica', style: 'sectionTitle' },
+                        ...this.cvDat.formacion.map(form => ({
+                            text: `${form.titulo} en ${form.institucion} (${form.periodo})`,
+                            margin: [0, 2, 0, 2]
+                        })),
+
+                        // --- HABILIDADES ---
+                        { text: 'Habilidades', style: 'sectionTitle' },
+                        { text: this.cvDat.habilidades, style: 'bodyText' }
                     ],
                     styles: {
                         header: { fontSize: 22, bold: true, alignment: 'center' },
+                        subHeader: { fontSize: 16, alignment: 'center', color: '#555', margin: [0, 0, 0, 10] },
                         contact: { fontSize: 10, alignment: 'center', color: 'gray' },
-                        sectionTitle: { fontSize: 14, bold: true, decoration: 'underline', margin: [0, 10, 0, 5] }
+                        sectionTitle: { fontSize: 14, bold: true, decoration: 'underline', margin: [0, 10, 0, 5] },
+                        bodyText: { fontSize: 11, lineHeight: 1.2, margin: [0, 0, 0, 5] }
                     }
                 };
             },

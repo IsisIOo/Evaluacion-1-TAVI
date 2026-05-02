@@ -1,7 +1,8 @@
-import httpClient from "../http-common"
+import httpClient from "../http-common";
 
-const getCvJson = () => {
-  return httpClient.get('/api/cliente/json');
+const generateCv = (surveyData) => {
+  // Realiza el POST con los datos de la encuesta
+  return httpClient.post('/generate', surveyData);
 };
 
-export default { getCvJson};
+export default { generateCv };
