@@ -64,15 +64,14 @@
             await this.getJson();
         },
 
-
         methods: {
             async getJson() {
                 this.loading = true;
                 try {
-                    const dLLM = window.history.state?.dataLlm;
+                    const dLLM = window.history.state;
 
                     if(dLLM && dLLM.dataLlm){
-                        this.cvDat = dLLM.dataLlm;
+                        this.cvDat = dLLM.dataLlm.cv_data;
                     }
 
                     console.log("JSON recibido exitosamente", this.cvDat);

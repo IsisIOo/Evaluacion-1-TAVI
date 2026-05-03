@@ -252,11 +252,14 @@ export default {
         };
 
         const response = await httpClient.post('/api/cv/generate', payload);
-        this.generatedCv = response.data;
+        //this.generatedCv = response.data;
+        const cleanData = JSON.parse(JSON.stringify(response.data));
+
+        this.generatedCv = cleanData;
 
         this.$router.push({
           name: 'pdf',
-          state: {dataLlm: this.generatedCv}
+          state: {dataLlm: cleanData}
         });
 
         console.log('Respuesta de la IA:', response.data);
