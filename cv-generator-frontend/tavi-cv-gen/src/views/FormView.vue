@@ -253,6 +253,12 @@ export default {
 
         const response = await httpClient.post('/api/cv/generate', payload);
         this.generatedCv = response.data;
+
+        this.$router.push({
+          name: 'pdf',
+          state: {dataLlm: this.generatedCv}
+        });
+
         console.log('Respuesta de la IA:', response.data);
       } catch (error) {
         console.error('Error al enviar:', error);
