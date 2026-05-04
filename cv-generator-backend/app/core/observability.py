@@ -113,8 +113,13 @@ class AsyncObservabilityCallback(AsyncCallbackHandler):
         """
         Guarda el log en MongoDB
         """
-        db = get_db()
-        if db:
+        try:
+            db = get_db()
+        except Exception as e:
+            logger.warning(f"[{self.request_id}] No se pudo obtener la conexión a MongoDB: {e}. Log no guardado: {log_entry}")
+            return
+
+        if db is not None:
             try:
                 await db.observability_logs.insert_one(log_entry)
                 logger.info(f"[{self.request_id}] Log guardado en MongoDB. Costo: ${log_entry.get('cost_usd', 0):.6f}")

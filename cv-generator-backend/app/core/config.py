@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str | None = Field(None, description="API key para acceder a modelo Gemini")
     MODEL_NAME: str = Field(default="gemini-2.5-flash", description="Nombre del modelo a usar")
     MAX_TOKENS: int = Field(default=1000, description="Máximo de tokens en la respuesta del modelo")
+    TEMPERATURE: float = Field(default=0.1, description="Temperatura para la generación del modelo")
+    TOP_P: float = Field(default=0.95, description="Probabilidad acumulada top-p para el muestreo del modelo")
+    TOP_K: int = Field(default=40, description="Número máximo de tokens a considerar en top-k para el modelo")
     
     # Configuración de Pydantic para leer el .env
     model_config = SettingsConfigDict(

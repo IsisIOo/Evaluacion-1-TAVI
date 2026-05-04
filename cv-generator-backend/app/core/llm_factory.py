@@ -1,18 +1,34 @@
 import logging
-import google.generativeai as genai
+from langchain_google_genai import ChatGoogleGenerativeAI
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Configurar el SDK de Google
-if settings.GEMINI_API_KEY:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-    logger.info("Google Generative AI configurado correctamente.")
+# Inicializa los modelos una sola vez para que estén disponibles en toda la aplicación
+# Definimos parámetros claros de temperatura, top_p, top_k y tokens.
 
-def get_model():
-    """Retorna la instancia del modelo configurada."""
-    # Usamos response_mime_type para forzar salida JSON nativa
-    return genai.GenerativeModel(
-        model_name=settings.MODEL_NAME,
-        generation_config={"response_mime_type": "application/json"}
-    )
+deterministic_llm = ChatGoogleGenerativeAI(
+    model=settings.MODEL_NAME,
+    google_api_key=settings.GEMINI_API_KEY,
+    temperature=settings.TEMPERATURE,
+    top_p=settings.TOP_P,
+    top_k=settings.TOP_K,
+    max_tokens=settings.MAX_TOKENS,
+)
+
+creative_llm = ChatGoogleGenerativeAI(
+    model=settings.MODEL_NAME,
+    google_api_key=settings.GEMINI_API_KEY,
+    temperature=0.8,
+    top_p=0.95,
+    top_k=40,
+    max_tokens=settings.MAX_TOKENS,
+)
+
+
+def get_deterministic_llm() -> ChatGoogleGenerativeAI:
+    return deterministic_llm
+
+
+def get_creative_llm() -> ChatGoogleGenerativeAI:
+    return creative_llm
