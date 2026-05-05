@@ -2,7 +2,7 @@ import logging
 from app.core.config import settings
 from app.schemas.cv_request import CVRequest
 from app.schemas.cv_response import CVResponse
-from app.core.llm_factory import get_deterministic_llm
+from app.core.llm_factory import get_deterministic_llm, get_local_llm
 from app.core.observability import AsyncObservabilityCallback
 
 logger = logging.getLogger(__name__)

@@ -167,7 +167,7 @@ App running at:
 - Local:   http://localhost:8080
 ```
 
-✅ Frontend en http://localhost:8080 (o el puerto que muestre)
+✅ Frontend en http://localhost:3000 (o el puerto que muestre)
 
 ---
 

@@ -49,13 +49,35 @@ class AsyncObservabilityCallback(AsyncCallbackHandler):
         end_time = datetime.now(timezone.utc)
         duration = (end_time - self.start_time).total_seconds() if self.start_time else None
 
-        # Extraer información relevante del response
+        # extraer el output general
         llm_output = response.llm_output or {}
+        
+        # intentar obtener el diccionario de uso (puede venir en varios formatos)
         token_usage = llm_output.get("token_usage", {})
+        
+        # --- Lógica de extracción multimodelo ---
+        # Intentamos las llaves estándar (OpenAI/Llama) y las de Google (Gemini)
+        input_tokens = (
+            token_usage.get("prompt_tokens") or 
+            token_usage.get("prompt_token_count") or 
+            0
+        )
+        output_tokens = (
+            token_usage.get("completion_tokens") or 
+            token_usage.get("candidates_token_count") or 
+            token_usage.get("output_tokens") or 
+            0
+        )
+        
+        # Si sigue siendo 0, a veces Gemini guarda la info en la primera "generación"
+        if input_tokens == 0 and response.generations:
+            generation_info = response.generations[0][0].generation_info or {}
+            usage = generation_info.get("usage_metadata", {}) # Formato nuevo de LangChain
+            input_tokens = usage.get("prompt_token_count", 0)
+            output_tokens = usage.get("candidates_token_count", 0)
 
-        input_tokens = token_usage.get("prompt_tokens", 0)
-        output_tokens = token_usage.get("completion_tokens", 0)
         total_tokens = token_usage.get("total_tokens", input_tokens + output_tokens)
+        # ------------------------------------------
 
         # Calcular costos aproximados
         cost = self._calculate_cost(settings.MODEL_NAME, input_tokens, output_tokens)
@@ -74,7 +96,6 @@ class AsyncObservabilityCallback(AsyncCallbackHandler):
             "status": "success"                 # estado de la llamada
         }
 
-        # Guardar en MongoDB
         await self._save_log(log_entry)
 
     async def on_llm_error(self, error: BaseException, **kwargs: Any) -> None:
