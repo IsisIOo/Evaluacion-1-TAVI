@@ -147,6 +147,20 @@
             <v-btn v-else color="success" :loading="loading" @click="submitForm">Generar CV</v-btn>
           </v-card-actions>
         </v-stepper>
+
+        <v-card v-if="generatedCv" class="mt-4 pa-4" elevation="2">
+          <div class="d-flex justify-space-between align-center mb-4">
+            <div>
+              <h3 class="text-h6 mb-1">CV generado con éxito</h3>
+              <p class="mb-0">Haz clic en el botón para descargar el archivo JSON.</p>
+            </div>
+            <v-btn color="primary" @click="downloadJson">Descargar JSON</v-btn>
+          </div>
+          <v-divider class="mb-4"></v-divider>
+          <pre class="pa-3" style="max-height: 320px; overflow:auto; background:#f9f9f9; border-radius:8px;">
+{{ JSON.stringify(generatedCv, null, 2) }}
+          </pre>
+        </v-card>
       </v-col>
     </v-row>
   </v-container>
@@ -162,6 +176,7 @@ export default {
     loading: false,
     valid: false,
     showValidationError: false,
+    generatedCv: null,
     steps: ['Contacto', 'Perfil', 'Experiencia', 'Formación', 'Confirmar'],
     rules: {
       required: value => !!value || 'Este campo es obligatorio.',
@@ -170,6 +185,7 @@ export default {
         return pattern.test(value) || 'Correo electrónico no válido.';
       },
     },
+    userId: crypto.randomUUID ? crypto.randomUUID() : `user-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
     form: {
       personal: { 
         nombre_completo: '', 
@@ -230,13 +246,41 @@ export default {
       }
       this.loading = true;
       try {
-        const response = await httpClient.post('/api/cv/generate', this.form);
+        const payload = {
+          user_id: this.userId,
+          ...this.form,
+        };
+
+        const response = await httpClient.post('/api/cv/generate', payload);
+        //this.generatedCv = response.data;
+        const cleanData = JSON.parse(JSON.stringify(response.data));
+
+        this.generatedCv = cleanData;
+
+        this.$router.push({
+          name: 'pdf',
+          state: {dataLlm: cleanData}
+        });
+
         console.log('Respuesta de la IA:', response.data);
       } catch (error) {
         console.error('Error al enviar:', error);
       } finally {
         this.loading = false;
       }
+    },
+    downloadJson() {
+      if (!this.generatedCv) return;
+      const jsonString = JSON.stringify(this.generatedCv, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `cv-${this.userId}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     }
   }
 }
