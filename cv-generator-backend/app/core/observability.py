@@ -48,36 +48,45 @@ class AsyncObservabilityCallback(AsyncCallbackHandler):
         """
         end_time = datetime.now(timezone.utc)
         duration = (end_time - self.start_time).total_seconds() if self.start_time else None
+        
+        # --- INICIO: Lógica de obtención tokens usados ---
+        input_tokens = 0
+        output_tokens = 0
+        total_tokens = 0
+        
+        # Estrategia 1: Extraer desde llm_output (Patrón tradicional de LangChain, común en modelos locales)
+        if response.llm_output and "token_usage" in response.llm_output:
+            usage = response.llm_output["token_usage"]
+            input_tokens = usage.get("prompt_tokens", 0)
+            output_tokens = usage.get("completion_tokens", 0)
+            total_tokens = usage.get("total_tokens", input_tokens + output_tokens)
 
-        # extraer el output general
-        llm_output = response.llm_output or {}
+        # Estrategia 2: Extraer desde las metadatas del mensaje (Patrón moderno para ChatModels como Gemini)
+        if total_tokens == 0 and response.generations:
+            try:
+                first_generation = response.generations[0][0]
+                if hasattr(first_generation, 'message'):
+                    message = first_generation.message
+                    
+                    # Estándar reciente de LangChain (usage_metadata)
+                    if hasattr(message, 'usage_metadata') and message.usage_metadata:
+                        input_tokens = message.usage_metadata.get("input_tokens", 0)
+                        output_tokens = message.usage_metadata.get("output_tokens", 0)
+                        total_tokens = message.usage_metadata.get("total_tokens", input_tokens + output_tokens)
+                    
+                    # Fallback a response_metadata (donde algunos proveedores empaquetan la respuesta cruda)
+                    elif hasattr(message, 'response_metadata') and 'token_usage' in message.response_metadata:
+                        usage = message.response_metadata['token_usage']
+                        input_tokens = usage.get("prompt_tokens", 0)
+                        output_tokens = usage.get("completion_tokens", 0)
+                        total_tokens = usage.get("total_tokens", input_tokens + output_tokens)
+            
+            except (IndexError, AttributeError) as e:
+                logger.warning(f"[{self.request_id}] No se pudo extraer la metadata de tokens de la generación: {e}")
         
-        # intentar obtener el diccionario de uso (puede venir en varios formatos)
-        token_usage = llm_output.get("token_usage", {})
-        
-        # --- Lógica de extracción multimodelo ---
-        # Intentamos las llaves estándar (OpenAI/Llama) y las de Google (Gemini)
-        input_tokens = (
-            token_usage.get("prompt_tokens") or 
-            token_usage.get("prompt_token_count") or 
-            0
-        )
-        output_tokens = (
-            token_usage.get("completion_tokens") or 
-            token_usage.get("candidates_token_count") or 
-            token_usage.get("output_tokens") or 
-            0
-        )
-        
-        # Si sigue siendo 0, a veces Gemini guarda la info en la primera "generación"
-        if input_tokens == 0 and response.generations:
-            generation_info = response.generations[0][0].generation_info or {}
-            usage = generation_info.get("usage_metadata", {}) # Formato nuevo de LangChain
-            input_tokens = usage.get("prompt_token_count", 0)
-            output_tokens = usage.get("candidates_token_count", 0)
-
-        total_tokens = token_usage.get("total_tokens", input_tokens + output_tokens)
-        # ------------------------------------------
+        # Loggeamos el uso para tener visibilidad inmediata en consola
+        logger.info(f"[{self.request_id}] Consumo de tokens - Input: {input_tokens} | Output: {output_tokens} | Total: {total_tokens}")
+        # --- FIN: Lógica de obtención tokens usados ---
 
         # Calcular costos aproximados
         cost = self._calculate_cost(settings.MODEL_NAME, input_tokens, output_tokens)
