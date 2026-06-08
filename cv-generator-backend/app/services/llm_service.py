@@ -12,8 +12,8 @@ async def generate_cv(request: CVRequest) -> CVResponse:
     Construye el prompt para el LLM y devuelve la respuesta estructurada del CV.
     Utiliza LangChain para invocar el modelo con .ainvoke y registrar el callback.
     """
-    llm_estricto = get_deterministic_llm()
-    modelo_con_formato = llm_estricto.with_structured_output(CVResponse)
+    llm = get_deterministic_llm()
+    modelo_con_formato = llm.with_structured_output(CVResponse)
     observability_callback = AsyncObservabilityCallback(user_id=request.user_id)
 
     prompt = _build_cv_prompt(request)
