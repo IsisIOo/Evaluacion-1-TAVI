@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from app.core.config import settings
 from app.schemas.cv_request import CVRequest
@@ -20,9 +21,12 @@ async def generate_cv(request: CVRequest) -> CVResponse:
     logger.info(f"Generando CV para user_id={request.user_id} con modelo={settings.MODEL_NAME}")
 
     try:
-        respuesta = await modelo_con_formato.ainvoke(
-            prompt,
-            config={"callbacks": [observability_callback]}
+        respuesta = await asyncio.wait_for(
+            modelo_con_formato.ainvoke(
+                prompt,
+                config={"callbacks": [observability_callback]}
+            ),
+            timeout=settings.LLM_TIMEOUT
         )
 
         if isinstance(respuesta, CVResponse):
@@ -30,6 +34,9 @@ async def generate_cv(request: CVRequest) -> CVResponse:
 
         return CVResponse.model_validate(respuesta)
 
+    except asyncio.TimeoutError:
+        logger.error("Timeout en la llamada al LLM")
+        raise TimeoutError("La IA está tardando demasiado en responder. Intenta nuevamente.")
     except Exception as e:
         logger.error(f"Error en el servicio de IA: {str(e)}")
         raise RuntimeError(f"Falla en el servicio de IA: {str(e)}")

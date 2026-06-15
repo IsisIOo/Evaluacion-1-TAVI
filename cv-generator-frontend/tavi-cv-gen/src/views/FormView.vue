@@ -126,7 +126,7 @@
             </v-stepper-window-item>
           </v-stepper-window>
 
-          <!-- Alerta de Error -->
+          <!-- Alerta de Error de validación -->
           <v-alert  
             v-if="showValidationError"  
             type="error"  
@@ -137,6 +137,19 @@
             @click:close="showValidationError = false" 
           >
             Debe rellenar todos los campos obligatorios antes de continuar.
+          </v-alert>
+
+          <!-- Alerta de Error de API -->
+          <v-alert
+            v-if="showApiError"
+            type="error"
+            variant="tonal"
+            class="mx-4 mb-2"
+            density="compact"
+            closable
+            @click:close="showApiError = false"
+          >
+            {{ apiError }}
           </v-alert>
 
           <v-divider></v-divider>
@@ -176,6 +189,8 @@ export default {
     loading: false,
     valid: false,
     showValidationError: false,
+    showApiError: false,
+    apiError: '',
     generatedCv: null,
     steps: ['Contacto', 'Perfil', 'Experiencia', 'Formación', 'Confirmar'],
     rules: {
@@ -265,6 +280,9 @@ export default {
         console.log('Respuesta de la IA:', response.data);
       } catch (error) {
         console.error('Error al enviar:', error);
+        this.apiError = error.userMessage || 'Ha ocurrido un error inesperado.';
+        this.showApiError = true;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } finally {
         this.loading = false;
       }

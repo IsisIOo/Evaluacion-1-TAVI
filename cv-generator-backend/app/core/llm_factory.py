@@ -15,6 +15,7 @@ deterministic_llm = ChatGoogleGenerativeAI(
     top_p=settings.TOP_P,
     top_k=settings.TOP_K,
     max_tokens=settings.MAX_TOKENS,
+    timeout=settings.LLM_TIMEOUT,
 )
 
 creative_llm = ChatGoogleGenerativeAI(
@@ -24,6 +25,7 @@ creative_llm = ChatGoogleGenerativeAI(
     top_p=0.95,
     top_k=40,
     max_tokens=settings.MAX_TOKENS,
+    timeout=settings.LLM_TIMEOUT,
 )
 
 
