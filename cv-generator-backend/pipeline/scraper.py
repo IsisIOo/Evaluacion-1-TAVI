@@ -1,6 +1,8 @@
 # Script de extracción con Playwright/BS4
 import json
 import urllib.parse
+import os
+import time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -22,7 +24,11 @@ def bloquear_recursos(route, request):
 
 def iniciar_scraper():
     areas_config = cargar_config()
-    enlaces_totales = []
+    ofertas_a_procesar = [] # array de dicts: {"url": link, "area_trabajo": area}
+
+    # archivo de salida
+    ruta_salida = Path(__file__).resolve().parent.parent / 'data' / 'datos_ofertas.jsonl'
+    ruta_salida.parent.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
         # lanzar navegador
@@ -42,6 +48,10 @@ def iniciar_scraper():
         page = context.new_page()
         # bloquear recursos innecesarios
         page.route("**/*", bloquear_recursos)
+
+        tiempo_inicio = time.time()
+
+        print("||| FASE 1: EXTRACCIÓN DE ENLACES |||")
 
         for area in areas_config:
             print(f"=== Explorando Area: {area['area']} ===")
@@ -69,7 +79,11 @@ def iniciar_scraper():
                             links_unicos.add(href)
                     
                     links_finales = list(links_unicos)[:10] # se toman las 10 primeras ofertas
-                    enlaces_totales.extend(links_finales)
+                    for link in links_finales:
+                        ofertas_a_procesar.append({
+                            "url": link,
+                            "area_trabajo": area['area']
+                        })
 
                     print(f"    Encontrados {len(links_finales)} enlaces para '{keyword}'")
                 except Exception as e:
@@ -78,7 +92,37 @@ def iniciar_scraper():
                 # pequeña pausa entre búsquedas para evitar bloqueos
                 page.wait_for_timeout(2000)
 
-        print(f"\n=== Total de enlaces encontrados: {len(enlaces_totales)} ===")
+        print(f"\n=== Total de enlaces encontrados: {len(ofertas_a_procesar)} ===")
+
+        print("\n||| FASE 2: EXTRACCIÓN DE DESCRIPCIONES |||")
+
+        with ruta_salida.open('w', encoding='utf-8') as f:
+            for oferta in ofertas_a_procesar:
+                url_oferta = oferta['url']
+                area_trabajo = oferta['area_trabajo']
+
+                try:
+                    page.goto(url_oferta, wait_until="domcontentloaded")
+                    panel_descripcion = page.locator('article.panelFormulario').filter(has_text="DESCRIPCIÓN")
+                    parrafo_descripcion = panel_descripcion.locator('.panel-body p').first
+                    parrafo_descripcion.wait_for(state="attached", timeout=5000)
+                    texto_descripcion = parrafo_descripcion.inner_text().strip()
+
+                    # armar dict
+                    registro = {
+                        "area_trabajo": area_trabajo,
+                        "descripcion": texto_descripcion
+                    }
+                    f.write(json.dumps(registro, ensure_ascii=False) + "\n")
+                    print(f"    Procesada oferta: {url_oferta}")
+                except Exception as e:
+                    print(f"    [X] Error al procesar '{url_oferta}': {e}")
+                
+                page.wait_for_timeout(1000) # pausa entre ofertas
+        
+        tiempo_fin = time.time()
+        duracion = tiempo_fin - tiempo_inicio
+        print(f"\n=== Scraping finalizado en {duracion:.2f} segundos ===")
 
         context.close()
         browser.close()
