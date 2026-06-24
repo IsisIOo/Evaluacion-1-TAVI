@@ -3,6 +3,9 @@ import HomeView from '../views/HomeView.vue'
 import AboutView from '@/views/AboutView.vue'
 import FormView from '@/views/FormView.vue'
 import PdfView from '@/views/PdfView.vue'
+import LoginView from '@/views/LoginView.vue'
+import RegisterView from '@/views/RegisterView.vue'
+import MyCvsView from '@/views/MyCvsView.vue'
 
 const routes = [
   {
@@ -21,9 +24,25 @@ const routes = [
     component: FormView
   },
   {
-    path: '/PDF',
+    path: '/PDF/:cvId?',
     name: 'pdf',
-    component: PdfView
+    component: PdfView,
+    props: true
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: LoginView
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: RegisterView
+  },
+  {
+    path: '/my-cvs',
+    name: 'my-cvs',
+    component: MyCvsView
   }
 ]
 

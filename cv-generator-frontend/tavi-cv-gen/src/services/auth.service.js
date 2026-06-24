@@ -1,43 +1,51 @@
 import httpClient from "../http-common"
 import { jwtDecode } from "jwt-decode";
 
-const login = (loginDto) => {
-  return httpClient.post('/auth/login', loginDto)
-    .then((response) => {
-      // Captura el token del header 'Authorization'
-      const token = response.headers['authorization'];
-      if (token) {
-        // Guardar solo el token en localStorage
-        localStorage.setItem('token', `Bearer ${token}`);
-        console.log("Token guardado en localStorage:", token);
-        const decodedToken = jwtDecode(token);
-        console.log("CONTENIDO TOKEN",decodedToken);
+const API_URL = "/api/auth";
 
-        const user = {
-          id_cliente: decodedToken.id_cliente,
-          username: decodedToken.username,
-          direccion: JSON.parse(decodedToken.direccion),
-          email: decodedToken.email,
-          telefono: decodedToken.telefono,
-          direccionPrincipal: null,
-        }
+const login = async (loginDto) => {
+  const params = new URLSearchParams();
+  params.append("username", loginDto.email);
+  params.append("password", loginDto.password);
 
-        console.log("OBJ LOGGED USER",user);
-        // Guardar el usuario en localStorage
-        localStorage.setItem('user', JSON.stringify(user));
+  const response = await httpClient.post(`${API_URL}/login`, params, {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  });
 
-      } else {
-        console.error("No se recibió el token en el header 'Authorization'");
-      }
-      return response;
-    })
-    .catch((error) => {
-      console.error("Error al hacer login", error);
-    });
+  const token = response.data.access_token;
+  if (token) {
+    localStorage.setItem("token", token);
+    const decoded = jwtDecode(token);
+    const user = {
+      id: decoded.sub,
+      email: loginDto.email,
+    };
+    localStorage.setItem("user", JSON.stringify(user));
+  }
+  return response.data;
 };
 
-const register = registerDto => {
-    return httpClient.post('/auth/register', registerDto);
-}
+const register = async (registerDto) => {
+  const response = await httpClient.post(`${API_URL}/register`, registerDto);
+  return response.data;
+};
 
-export default {login, register};
+const logout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+};
+
+const getCurrentUser = () => {
+  const user = localStorage.getItem("user");
+  return user ? JSON.parse(user) : null;
+};
+
+const getToken = () => {
+  return localStorage.getItem("token");
+};
+
+const isLoggedIn = () => {
+  return !!getToken();
+};
+
+export default { login, register, logout, getCurrentUser, getToken, isLoggedIn };

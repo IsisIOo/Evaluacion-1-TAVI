@@ -8,6 +8,14 @@ from app.core.observability import AsyncObservabilityCallback
 
 logger = logging.getLogger(__name__)
 
+class QuotaExceededError(Exception):
+    pass
+
+def _is_quota_error(error: str) -> bool:
+    keywords = ["quota", "resource exhausted", "rate limit", "429", "too many requests",
+                "insufficient tokens", "daily limit", "monthly limit"]
+    return any(kw in error.lower() for kw in keywords)
+
 async def generate_cv(request: CVRequest) -> CVResponse:
     """
     Construye el prompt para el LLM y devuelve la respuesta estructurada del CV.
@@ -37,9 +45,14 @@ async def generate_cv(request: CVRequest) -> CVResponse:
     except asyncio.TimeoutError:
         logger.error("Timeout en la llamada al LLM")
         raise TimeoutError("La IA está tardando demasiado en responder. Intenta nuevamente.")
+    except QuotaExceededError:
+        raise
     except Exception as e:
-        logger.error(f"Error en el servicio de IA: {str(e)}")
-        raise RuntimeError(f"Falla en el servicio de IA: {str(e)}")
+        error_msg = str(e)
+        logger.error(f"Error en el servicio de IA: {error_msg}")
+        if _is_quota_error(error_msg):
+            raise QuotaExceededError("La cuota de la API se ha agotado. Intenta nuevamente más tarde.")
+        raise RuntimeError(f"Falla en el servicio de IA: {error_msg}")
 
 
 def _build_cv_prompt(request: CVRequest) -> str:

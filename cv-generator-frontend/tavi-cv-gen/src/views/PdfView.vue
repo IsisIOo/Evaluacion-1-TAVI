@@ -47,11 +47,13 @@
 <script>
     import pdfMake from "pdfmake/build/pdfmake";
     import pdfFonts from "pdfmake/build/vfs_fonts";
+    import httpClient from "@/http-common.js";
 
     pdfMake.vfs = pdfFonts && pdfFonts.pdfMake ? pdfFonts.pdfMake.vfs : pdfMake.vfs;
 
     export default{
         name: 'PdfView',
+        props: ['cvId'],
         data () {
             return {
                 cvDat: null,
@@ -68,14 +70,19 @@
             async getJson() {
                 this.loading = true;
                 try {
-                    const dLLM = window.history.state;
+                    const cvId = this.cvId || this.$route.params?.cvId;
 
-                    if(dLLM && dLLM.dataLlm){
-                        this.cvDat = dLLM.dataLlm.cv_data;
+                    if (cvId) {
+                        const res = await httpClient.get(`/api/cv/${cvId}`);
+                        this.cvDat = res.data.cv_data;
+                    } else {
+                        const dLLM = window.history.state;
+                        if(dLLM && dLLM.dataLlm){
+                            this.cvDat = dLLM.dataLlm.cv_data;
+                        }
                     }
 
                     console.log("JSON recibido exitosamente", this.cvDat);
-                    //await this.preview();
                 } 
                 catch(error){
                     console.error("Error al cargar el JSON", error);

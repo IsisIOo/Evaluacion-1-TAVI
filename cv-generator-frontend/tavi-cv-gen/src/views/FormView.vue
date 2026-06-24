@@ -181,6 +181,7 @@
 
 <script>
 import httpClient from '@/http-common.js';
+import authService from '@/services/auth.service.js';
 
 export default {
   name: 'FormView',
@@ -200,7 +201,7 @@ export default {
         return pattern.test(value) || 'Correo electrónico no válido.';
       },
     },
-    userId: crypto.randomUUID ? crypto.randomUUID() : `user-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+    userId: authService.getCurrentUser()?.id || (crypto.randomUUID ? crypto.randomUUID() : `user-${Date.now()}-${Math.floor(Math.random() * 1000000)}`),
     form: {
       personal: { 
         nombre_completo: '', 
