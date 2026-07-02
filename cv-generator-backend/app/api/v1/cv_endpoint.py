@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from app.schemas.cv_response import CVResponse
 from app.schemas.cv_request import CVRequest
-from app.services.llm_service import generate_cv
+from app.services.llm_service import generate_cv, QuotaExceededError
 from app.db.cv_repository import CVRepository
 
 logger = logging.getLogger(__name__)
@@ -35,11 +35,19 @@ async def generate_cv_endpoint(request: CVRequest):
             "cv_data": cv_response.model_dump()
         }
         
+    except HTTPException:
+        raise
+    except TimeoutError as e:
+        logger.error(f"Timeout al generar CV: {e}")
+        raise HTTPException(status_code=504, detail=str(e))
+    except QuotaExceededError as e:
+        logger.error(f"Cuota de API agotada: {e}")
+        raise HTTPException(status_code=429, detail=str(e))
     except Exception as e:
         logger.error(f"Error al generar y guardar el CV: {e}")
         raise HTTPException(
             status_code=500,
-            detail="Error al generar el CV. Por favor, inténtalo de nuevo más tarde."
+            detail=str(e) if str(e) else "Error al generar el CV. Por favor, inténtalo de nuevo más tarde."
         )
 
 

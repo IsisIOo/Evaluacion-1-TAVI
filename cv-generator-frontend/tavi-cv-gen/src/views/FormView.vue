@@ -325,6 +325,32 @@
             </v-stepper-window-item>
           </v-stepper-window>
 
+          <!-- Alerta de Error de validación -->
+          <v-alert  
+            v-if="showValidationError"  
+            type="error"  
+            variant="tonal"  
+            class="mx-4 mb-2"  
+            density="compact" 
+            closable 
+            @click:close="showValidationError = false" 
+          >
+            Debe rellenar todos los campos obligatorios antes de continuar.
+          </v-alert>
+
+          <!-- Alerta de Error de API -->
+          <v-alert
+            v-if="showApiError"
+            type="error"
+            variant="tonal"
+            class="mx-4 mb-2"
+            density="compact"
+            closable
+            @click:close="showApiError = false"
+          >
+            {{ apiError }}
+          </v-alert>
+
           <v-divider></v-divider>
           <v-card-actions class="pa-4">
             <v-btn v-if="step > 1" variant="text" @click="prevStep">Atrás</v-btn>
@@ -354,6 +380,7 @@
 
 <script>
 import httpClient from '@/http-common.js';
+import authService from '@/services/auth.service.js';
 
 export default {
   name: 'FormView',
@@ -362,6 +389,8 @@ export default {
     loading: false,
     valid: false,
     showValidationError: false,
+    showApiError: false,
+    apiError: '',
     generatedCv: null,
     steps: ['Contacto', 'Perfil', 'Experiencia', 'Formación', 'Confirmar'],
     rules: {
@@ -370,42 +399,8 @@ export default {
         const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
         return pattern.test(value) || 'Correo electrónico no válido.';
       },
-      rut: value => {
-        if (!value) return 'Este campo es obligatorio.';
-        const clean = value.replace(/\./g, '').replace(/-/g, '').toUpperCase();
-        if (!/^\d{7,8}[0-9K]$/.test(clean)) return 'RUT inválido.';
-        const body = clean.slice(0, -1);
-        const dv = clean.slice(-1);
-        let sum = 0;
-        let mul = 2;
-        for (let i = body.length - 1; i >= 0; i--) {
-          sum += parseInt(body[i], 10) * mul;
-          mul = mul === 7 ? 2 : mul + 1;
-        }
-        const expected = 11 - (sum % 11);
-        const dvExpected = expected === 11 ? '0' : expected === 10 ? 'K' : String(expected);
-        return dv === dvExpected || 'RUT inválido.';
-      },
-      phone: value => {
-        if (!value) return 'Este campo es obligatorio.';
-        const clean = value.replace(/\D/g, '');
-        return (clean.length >= 9 && clean.length <= 12) || 'Teléfono inválido.';
-      },
-      url: value => {
-        if (!value) return true;
-        try {
-          new URL(value);
-          return true;
-        } catch {
-          return 'URL inválida.';
-        }
-      },
-      minLength: length => value => {
-        if (!value) return 'Este campo es obligatorio.';
-        return value.trim().length >= length || `Debe tener al menos ${length} caracteres.`;
-      },
     },
-    userId: crypto.randomUUID ? crypto.randomUUID() : `user-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+    userId: authService.getCurrentUser()?.id || (crypto.randomUUID ? crypto.randomUUID() : `user-${Date.now()}-${Math.floor(Math.random() * 1000000)}`),
     form: {
       personal: { 
         nombre_completo: '', 
@@ -498,6 +493,9 @@ export default {
         console.log('Respuesta de la IA:', response.data);
       } catch (error) {
         console.error('Error al enviar:', error);
+        this.apiError = error.userMessage || 'Ha ocurrido un error inesperado.';
+        this.showApiError = true;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } finally {
         this.loading = false;
       }

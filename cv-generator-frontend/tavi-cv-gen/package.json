@@ -11,6 +11,7 @@
     "@mdi/font": "5.9.55",
     "axios": "^1.15.2",
     "core-js": "^3.8.3",
+    "jwt-decode": "^4.0.0",
     "pdfmake": "^0.3.7",
     "roboto-fontface": "*",
     "vue": "^3.2.13",

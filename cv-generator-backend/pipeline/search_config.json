@@ -1,0 +1,62 @@
+[
+  {
+    "area": "Administración, Finanzas y Recursos Humanos",
+    "keywords": ["Administrativo", "Contador", "Recursos Humanos", "Finanzas", "secretaria"]
+  },
+  {
+    "area": "Comercial, Ventas y Atención al Cliente",
+    "keywords": ["Vendedor", "Ejecutivo de Ventas", "Atención al Cliente", "Marketing", "Supervisor"]
+  },
+  {
+    "area": "Tecnología, Programación y Telecomunicaciones",
+    "keywords": ["Programador", "Soporte Técnico", "Analista de Sistemas", "Informático", "Telecomunicaciones"]
+  },
+  {
+    "area": "Ingeniería, Operaciones y Logística",
+    "keywords": ["Bodeguero", "Logística", "Abastecimiento", "Operaciones", "Comercio Exterior"]
+  },
+  {
+    "area": "Minería, Energía y Recursos Naturales",
+    "keywords": ["Operador", "Ingeniero en Minas", "Prevención de Riesgos", "Mecánico", "Geólogo"]
+  },
+  {
+    "area": "Construcción, Arquitectura e Inmobiliaria",
+    "keywords": ["Maestro", "Constructor Civil", "Ingeniero Civil", "Arquitecto", "Jefe de Obra"]
+  },
+  {
+    "area": "Salud, Medicina y Cuidado Personal",
+    "keywords": ["TENS", "Enfermero", "Médico", "Kinesiólogo", "Auxiliar de Farmacia"]
+  },
+  {
+    "area": "Educación, Ciencia e Investigación",
+    "keywords": ["Profesor", "Educador", "Docente", "Psicopedagogo", "Relator"]
+  },
+  {
+    "area": "Producción, Manufactura y Oficios Técnicos",
+    "keywords": ["Operario de Producción", "Soldador", "Eléctrico", "Mecánico Industrial", "Control de Calidad"]
+  },
+  {
+    "area": "Gastronomía, Turismo y Hotelería",
+    "keywords": ["Garzón", "Cocinero", "Ayudante de Cocina", "Manipulador de Alimentos", "Recepcionista"]
+  },
+  {
+    "area": "Leyes, Legal y Ciencias Sociales",
+    "keywords": ["Abogado", "Trabajador Social", "Procurador", "Asesor Legal", "Sociólogo"]
+  },
+  {
+    "area": "Diseño, Arte y Medios de Comunicación",
+    "keywords": ["Diseñador Gráfico", "Periodista", "Audiovisual", "Diseñador Web", "Fotógrafo"]
+  },
+  {
+    "area": "Agricultura, Ganadería, Pesca y Acuicultura",
+    "keywords": ["Agrónomo", "Operario Agrícola", "Técnico Agrícola", "Técnico Acuícola", "Veterinario"]
+  },
+  {
+    "area": "Gerencia, Dirección y Consulting",
+    "keywords": ["Jefe", "Gerente", "Consultor", "Subgerente", "Director"]
+  },
+  {
+    "area": "Fuerzas Armadas, Seguridad y Vigilancia",
+    "keywords": ["Guardia de Seguridad", "Vigilante Privado", "Conserje", "Supervisor de Seguridad", "Operador CCTV"]
+  }
+]

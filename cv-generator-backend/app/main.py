@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from app.db.session import connect_to_mongo, close_mongo_connection
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.api import api_router
@@ -49,6 +50,15 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # manejador global de excepciones
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        logger.error(f"Error no manejado: {exc}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Error interno del servidor. Por favor, intenta más tarde."}
+        )
 
     # rutas
     app.include_router(api_router, prefix="/api")
