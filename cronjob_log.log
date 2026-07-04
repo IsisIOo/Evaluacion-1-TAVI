@@ -1,0 +1,2 @@
+=== probando cronjob ===
+Error: PYTHON_PATH is not defined in .env file!
