@@ -17,27 +17,75 @@
             <v-stepper-window-item :value="1">
               <v-form ref="formStep1">
                 <v-card title="Información Personal" flat class="pa-4">
+                  <v-alert
+                    v-if="showValidationError && step === 1"
+                    type="error"
+                    variant="tonal"
+                    dense
+                    class="mb-4"
+                    border="left"
+                  >
+                    Revisa los campos obligatorios marcados en rojo y completa los datos faltantes.
+                  </v-alert>
                   <v-row>
                     <v-col cols="12" md="6">
-                      <v-text-field v-model="form.personal.nombre_completo" label="Nombre Completo *" :rules="[rules.required]" variant="outlined" />
+                      <v-text-field
+                        v-model="form.personal.nombre_completo"
+                        label="Nombre Completo *"
+                        :rules="[rules.required]"
+                        variant="outlined"
+                      />
                     </v-col>
                     <v-col cols="12" md="6">
-                      <v-text-field v-model="form.personal.profesion" label="Profesión / Cargo *" :rules="[rules.required]" variant="outlined" />
+                      <v-text-field
+                        v-model="form.personal.profesion"
+                        label="Profesión / Cargo *"
+                        :rules="[rules.required]"
+                        variant="outlined"
+                      />
                     </v-col>
                     <v-col cols="12" md="6">
-                      <v-text-field v-model="form.personal.rut" label="RUT *" :rules="[rules.required]" variant="outlined" placeholder="12.345.678-K" />
+                      <v-text-field
+                        v-model="form.personal.rut"
+                        label="RUT *"
+                        :rules="[rules.rut]"
+                        variant="outlined"
+                        placeholder="12.345.678-K"
+                      />
                     </v-col>
                     <v-col cols="12" md="6">
-                      <v-text-field v-model="form.personal.ciudad" label="Ciudad *" :rules="[rules.required]" variant="outlined" />
+                      <v-text-field
+                        v-model="form.personal.ciudad"
+                        label="Ciudad *"
+                        :rules="[rules.required]"
+                        variant="outlined"
+                      />
                     </v-col>
                     <v-col cols="12" md="6">
-                      <v-text-field v-model="form.personal.email" label="Correo Electrónico *" :rules="[rules.required, rules.email]" variant="outlined" />
+                      <v-text-field
+                        v-model="form.personal.email"
+                        label="Correo Electrónico *"
+                        :rules="[rules.required, rules.email]"
+                        variant="outlined"
+                      />
                     </v-col>
                     <v-col cols="12" md="6">
-                      <v-text-field v-model="form.personal.telefono" label="Teléfono *" :rules="[rules.required]" variant="outlined" />
+                      <v-text-field
+                        v-model="form.personal.telefono"
+                        label="Teléfono *"
+                        :rules="[rules.phone]"
+                        variant="outlined"
+                      />
                     </v-col>
                     <v-col cols="12">
-                      <v-text-field v-model="form.personal.linkedin" label="URL LinkedIn (Opcional)" variant="outlined" hint="Ej: https://linkedin.com/in/usuario" persistent-hint />
+                      <v-text-field
+                        v-model="form.personal.linkedin"
+                        label="URL LinkedIn (Opcional)"
+                        :rules="[rules.url]"
+                        variant="outlined"
+                        hint="Ej: https://linkedin.com/in/usuario"
+                        persistent-hint
+                      />
                     </v-col>
                   </v-row>
                 </v-card>
@@ -48,11 +96,41 @@
             <v-stepper-window-item :value="2">
               <v-form ref="formStep2">
                 <v-card title="Perfil Profesional y Habilidades" flat class="pa-4">
-                  <v-slider v-model="form.perfil.anios_experiencia" label="Años de experiencia" min="0" max="40" step="1" thumb-label color="primary" />
-                  
-                  <v-textarea v-model="form.perfil.experticia" label="Tus áreas de experticia *" :rules="[rules.required]" variant="outlined" rows="3" />
-                  
-                  <v-textarea v-model="form.perfil.propuesta_valor" label="Tu propuesta de valor *" :rules="[rules.required]" variant="outlined" rows="3">
+                  <v-alert
+                    v-if="showValidationError && step === 2"
+                    type="error"
+                    variant="tonal"
+                    dense
+                    class="mb-4"
+                    border="left"
+                  >
+                    Completa la información de perfil y habilidades con datos reales y claros.
+                  </v-alert>
+                  <v-slider
+                    v-model="form.perfil.anios_experiencia"
+                    label="Años de experiencia"
+                    min="0"
+                    max="40"
+                    step="1"
+                    thumb-label
+                    color="primary"
+                  />
+
+                  <v-textarea
+                    v-model="form.perfil.experticia"
+                    label="Tus áreas de experticia *"
+                    :rules="[rules.required, rules.minLength(20)]"
+                    variant="outlined"
+                    rows="3"
+                  />
+
+                  <v-textarea
+                    v-model="form.perfil.propuesta_valor"
+                    label="Tu propuesta de valor *"
+                    :rules="[rules.required, rules.minLength(20)]"
+                    variant="outlined"
+                    rows="3"
+                  >
                     <template v-slot:append>
                       <v-tooltip location="top" text="Enfócate en el área o trabajo que tienes en la mira.">
                         <template v-slot:activator="{ props }">
@@ -62,9 +140,16 @@
                     </template>
                   </v-textarea>
 
-                  <v-textarea v-model="form.habilidades" label="Habilidades Técnicas e Idiomas *" :rules="[rules.required]" variant="outlined" rows="3" placeholder="Ej: Python (Avanzado), Inglés (B2), Excel (Intermedio)">
+                  <v-textarea
+                    v-model="form.habilidades"
+                    label="Habilidades Técnicas e Idiomas *"
+                    :rules="[rules.required, rules.minLength(15)]"
+                    variant="outlined"
+                    rows="3"
+                    placeholder="Ej: Python (Avanzado), Inglés (B2), Excel (Intermedio)"
+                  >
                     <template v-slot:append>
-                      <v-tooltip location="top" text="Indica el software o idioma seguido de tu nivel de dominio para que la IA lo organice.">
+                      <v-tooltip location="top" text="Indica el software o idioma seguido de tu nivel de dominio.">
                         <template v-slot:activator="{ props }">
                           <v-icon v-bind="props" icon="mdi-help-circle-outline" color="primary" />
                         </template>
@@ -79,20 +164,78 @@
             <v-stepper-window-item :value="3">
               <v-form ref="formStep3">
                 <v-card title="Trayectoria Profesional" flat class="pa-4">
+                  <v-alert
+                    v-if="showValidationError && step === 3"
+                    type="error"
+                    variant="tonal"
+                    dense
+                    class="mb-4"
+                    border="left"
+                  >
+                    Completa todas las experiencias con cargo, empresa, periodo y descripción.
+                  </v-alert>
                   <div v-for="(exp, index) in form.experiencias" :key="index" class="mb-6 pa-4 border rounded">
                     <div class="d-flex justify-space-between align-center mb-2">
                       <span class="text-subtitle-1 font-weight-bold">Experiencia #{{ index + 1 }}</span>
-                      <v-btn icon="mdi-delete" size="small" color="error" variant="text" @click="removeExp(index)" v-if="form.experiencias.length > 1" />
+                      <v-btn
+                        icon="mdi-delete"
+                        size="small"
+                        color="error"
+                        variant="text"
+                        @click="removeExp(index)"
+                        v-if="form.experiencias.length > 1"
+                      />
                     </div>
                     <v-row>
-                      <v-col cols="12" md="6"><v-text-field v-model="exp.cargo" label="Cargo *" :rules="[rules.required]" variant="outlined" /></v-col>
-                      <v-col cols="12" md="6"><v-text-field v-model="exp.empresa" label="Empresa *" :rules="[rules.required]" variant="outlined" /></v-col>
-                      <v-col cols="12" md="6"><v-text-field v-model="exp.periodo" label="Periodo (Inicio - Fin) *" placeholder="Marzo 2024 - Actualidad" :rules="[rules.required]" variant="outlined" /></v-col>
-                      <v-col cols="12" md="6"><v-text-field v-model="exp.pais" label="País *" :rules="[rules.required]" variant="outlined" /></v-col>
-                      <v-col cols="12"><v-textarea v-model="exp.descripcion" label="Descripción y Logros *" :rules="[rules.required]" variant="outlined" rows="2" hint="Describe tus tareas y menciona al menos un logro." persistent-hint /></v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="exp.cargo"
+                          label="Cargo *"
+                          :rules="[rules.required]"
+                          variant="outlined"
+                        />
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="exp.empresa"
+                          label="Empresa *"
+                          :rules="[rules.required]"
+                          variant="outlined"
+                        />
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="exp.periodo"
+                          label="Periodo (Inicio - Fin) *"
+                          placeholder="Marzo 2024 - Actualidad"
+                          :rules="[rules.required]"
+                          variant="outlined"
+                        />
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="exp.pais"
+                          label="País *"
+                          :rules="[rules.required]"
+                          variant="outlined"
+                        />
+                      </v-col>
+                      <v-col cols="12">
+                        <v-textarea
+                          v-model="exp.descripcion"
+                          label="Descripción y Logros *"
+                          :rules="[rules.required, rules.minLength(20)]"
+                          variant="outlined"
+                          rows="2"
+                          hint="Describe tus tareas y menciona al menos un logro."
+                          persistent-hint
+                        />
+                      </v-col>
                     </v-row>
                   </div>
-                  <v-btn prepend-icon="mdi-plus" variant="tonal" color="primary" @click="addExp">Agregar otra experiencia</v-btn>
+                  <v-btn prepend-icon="mdi-plus" variant="tonal" color="primary" @click="addExp">
+                    Agregar otra experiencia
+                  </v-btn>
                 </v-card>
               </v-form>
             </v-stepper-window-item>
@@ -101,18 +244,59 @@
             <v-stepper-window-item :value="4">
               <v-form ref="formStep4">
                 <v-card title="Formación Educativa" flat class="pa-4">
+                  <v-alert
+                    v-if="showValidationError && step === 4"
+                    type="error"
+                    variant="tonal"
+                    dense
+                    class="mb-4"
+                    border="left"
+                  >
+                    Completa todos los datos de tu formación antes de continuar.
+                  </v-alert>
                   <div v-for="(edu, index) in form.formacion" :key="index" class="mb-6 pa-4 border rounded">
                     <div class="d-flex justify-space-between align-center mb-2">
                       <span class="text-subtitle-1 font-weight-bold">Educación #{{ index + 1 }}</span>
-                      <v-btn icon="mdi-delete" size="small" color="error" variant="text" @click="removeEdu(index)" v-if="form.formacion.length > 1" />
+                      <v-btn
+                        icon="mdi-delete"
+                        size="small"
+                        color="error"
+                        variant="text"
+                        @click="removeEdu(index)"
+                        v-if="form.formacion.length > 1"
+                      />
                     </div>
                     <v-row>
-                      <v-col cols="12" md="6"><v-text-field v-model="edu.titulo" label="Título / Diploma *" :rules="[rules.required]" variant="outlined" /></v-col>
-                      <v-col cols="12" md="6"><v-text-field v-model="edu.institucion" label="Institución *" :rules="[rules.required]" variant="outlined" /></v-col>
-                      <v-col cols="12"><v-text-field v-model="edu.periodo" label="Periodo (Inicio - Fin) *" placeholder="2020 - 2026" :rules="[rules.required]" variant="outlined" /></v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="edu.titulo"
+                          label="Título / Diploma *"
+                          :rules="[rules.required]"
+                          variant="outlined"
+                        />
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="edu.institucion"
+                          label="Institución *"
+                          :rules="[rules.required]"
+                          variant="outlined"
+                        />
+                      </v-col>
+                      <v-col cols="12">
+                        <v-text-field
+                          v-model="edu.periodo"
+                          label="Periodo (Inicio - Fin) *"
+                          placeholder="2020 - 2026"
+                          :rules="[rules.required]"
+                          variant="outlined"
+                        />
+                      </v-col>
                     </v-row>
                   </div>
-                  <v-btn prepend-icon="mdi-plus" variant="tonal" color="primary" @click="addEdu">Agregar otra formación</v-btn>
+                  <v-btn prepend-icon="mdi-plus" variant="tonal" color="primary" @click="addEdu">
+                    Agregar otra formación
+                  </v-btn>
                 </v-card>
               </v-form>
             </v-stepper-window-item>
@@ -120,8 +304,23 @@
             <!-- Paso 5: Finalizar -->
             <v-stepper-window-item :value="5">
               <v-card title="Finalizar y Enviar" flat class="pa-4">
+                <v-alert
+                  v-if="showValidationError && step === 5"
+                  type="error"
+                  variant="tonal"
+                  dense
+                  class="mb-4"
+                  border="left"
+                >
+                  Debes confirmar que la información es correcta antes de generar tu CV.
+                </v-alert>
                 <p class="mb-4">Revisa tus datos antes de enviar a la IA.</p>
-                <v-checkbox v-model="valid" label="Confirmo que la información es correcta" :rules="[v => !!v || 'Debes confirmar para continuar']" color="primary" />
+                <v-checkbox
+                  v-model="valid"
+                  label="Confirmo que la información es correcta"
+                  :rules="[v => !!v || 'Debes confirmar para continuar']"
+                  color="primary"
+                />
               </v-card>
             </v-stepper-window-item>
           </v-stepper-window>
@@ -239,24 +438,38 @@ export default {
     removeEdu(index) {
       this.form.formacion.splice(index, 1);
     },
+    async validateStep(stepNumber) {
+      const currentForm = this.$refs[`formStep${stepNumber}`];
+      if (!currentForm) return true;
+      const result = await currentForm.validate();
+      return typeof result === 'boolean' ? result : result.valid;
+    },
     async validateAndNext() {
-      const currentForm = this.$refs[`formStep${this.step}`];
-      if (currentForm) {
-        const { valid } = await currentForm.validate();
-        if (valid) {
-          this.showValidationError = false;
-          this.step++;
-        } else {
-          this.showValidationError = true;
+      const valid = await this.validateStep(this.step);
+      if (valid) {
+        this.showValidationError = false;
+        this.step++;
+      } else {
+        this.showValidationError = true;
+      }
+    },
+    async validateAllSteps() {
+      let allValid = true;
+      for (let index = 1; index <= 4; index++) {
+        const valid = await this.validateStep(index);
+        if (!valid) {
+          allValid = false;
         }
       }
+      return allValid;
     },
     prevStep() {
       this.showValidationError = false;
       this.step--;
     },
     async submitForm() {
-      if (!this.valid) {
+      const allValid = await this.validateAllSteps();
+      if (!allValid || !this.valid) {
         this.showValidationError = true;
         return;
       }
@@ -268,14 +481,13 @@ export default {
         };
 
         const response = await httpClient.post('/api/cv/generate', payload);
-        //this.generatedCv = response.data;
         const cleanData = JSON.parse(JSON.stringify(response.data));
 
         this.generatedCv = cleanData;
 
         this.$router.push({
           name: 'pdf',
-          state: {dataLlm: cleanData}
+          state: { dataLlm: cleanData }
         });
 
         console.log('Respuesta de la IA:', response.data);
