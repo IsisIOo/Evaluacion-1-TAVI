@@ -229,6 +229,15 @@ Durante el setup, se crearon/modificaron estos archivos:
 
 ---
 
+## Cronjob
+
+Se preparo un archivo `run_cronjob.sh` para correr un scraper y actualizar la base de conocimientos RAG.
+Para correr el cronjob los Lunes a las 01:05AM cada semana editar `crontab -e` en la maquina ubuntu local y escribir esto al final:
+
+```05 00 * * 1 $HOME/path/to/your/project/run_cronjob.sh >> $HOME/path/to/your/project/cronjob_log.log 2>&1```
+
+Errores y logs quedan guardados en cronjob_log.log
+
 ## 🚨 Importante
 
 - ⚠️ **No commitear `.env`** - Ya está en `.gitignore`
