@@ -32,7 +32,7 @@ def iniciar_scraper():
 
     with sync_playwright() as p:
         # lanzar navegador
-        browser = p.chromium.launch(headless=False, slow_mo=50)
+        browser = p.chromium.launch(headless=True, slow_mo=50) # headless=True es necesario para el cronjob en servers de github (no permiten GUI)
 
         # crear contexto para disfrazar scraper bot
         context = browser.new_context(
