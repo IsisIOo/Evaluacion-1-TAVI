@@ -1,442 +1,102 @@
 import asyncio
-import json
 import logging
-import re
-from typing import Any, Dict, List, Optional
-
-from langchain_core.messages import HumanMessage, SystemMessage
-
+import json
+import os
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
 from app.core.config import settings
-from app.core.llm_factory import get_deterministic_llm
-from app.core.observability import AsyncObservabilityCallback
 from app.schemas.cv_request import CVRequest
 from app.schemas.cv_response import CVResponse
+from app.core.llm_factory import get_deterministic_llm, get_local_llm
+from app.core.observability import AsyncObservabilityCallback
 
 logger = logging.getLogger(__name__)
 
+# Rutas para ChromaDB
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATA_DIR = os.path.join(BACKEND_DIR, "data")
+POINTER_PATH = os.path.join(DATA_DIR, "active_pointer.json")
 
-# ---------------------------------------------------------------------------
-# Errores
-# ---------------------------------------------------------------------------
 class QuotaExceededError(Exception):
     pass
 
-
 def _is_quota_error(error: str) -> bool:
-    keywords = [
-        "quota", "resource exhausted", "rate limit", "429",
-        "too many requests", "insufficient tokens",
-        "daily limit", "monthly limit",
-    ]
+    keywords = ["quota", "resource exhausted", "rate limit", "429", "too many requests",
+                "insufficient tokens", "daily limit", "monthly limit"]
     return any(kw in error.lower() for kw in keywords)
 
-
-# ---------------------------------------------------------------------------
-# Contexto general
-# ---------------------------------------------------------------------------
-ATS_SYSTEM_POLICY = (
-    "Eres un experto senior en recursos humanos y redacción de CVs profesionales "
-    "optimizados para sistemas ATS (Applicant Tracking Systems).\n"
-    "Reglas de estilo que SIEMPRE debes respetar:\n"
-    "- Tono profesional, en primera persona implícita (sin usar 'yo').\n"
-    "- Verbos de acción fuertes (Lideré, Implementé, Reduje, Diseñé, etc.).\n"
-    "- Métricas concretas cuando se puedan inferir del contexto.\n"
-    "- Vocabulario del sector del candidato.\n"
-    "- No inventar empresas, fechas, títulos ni datos concretos que NO ESTEN EN EL CONTEXTO.\n"
-    "- Devolver EXCLUSIVAMENTE un JSON válido, sin markdown, sin ```json, sin explicaciones."
-)
-
-
-def _build_general_context(request: CVRequest) -> str:
-    personal = request.personal
-    perfil = request.perfil
-
-    experiencias = "\n".join(
-        f"- {exp.cargo} en {exp.empresa} ({exp.periodo}, {exp.pais}): "
-        f"{exp.descripcion}. Logros: {exp.logros}"
-        for exp in request.experiencias
-    ) or "- (sin experiencias declaradas)"
-
-    formacion = "\n".join(
-        f"- {edu.titulo} en {edu.institucion} ({edu.periodo})"
-        for edu in request.formacion
-    ) or "- (sin formación declarada)"
-
-    return (
-        "## CONTEXTO GENERAL DEL CANDIDATO (úsalo para mantener coherencia)\n\n"
-        "### Información Personal\n"
-        f"- Nombre completo: {personal.nombre_completo}\n"
-        f"- Profesión: {personal.profesion}\n"
-        f"- Email: {personal.email}\n"
-        f"- Teléfono: {personal.telefono}\n"
-        f"- LinkedIn: {personal.linkedin}\n"
-        f"- RUT: {personal.rut}\n"
-        f"- Ciudad: {personal.ciudad}\n\n"
-        "### Perfil Profesional\n"
-        f"- Años de experiencia: {perfil.anios_experiencia}\n"
-        f"- Área de experticia: {perfil.experticia}\n"
-        f"- Propuesta de valor (borrador del candidato): {perfil.propuesta_valor}\n\n"
-        "### Experiencias Laborales (input)\n"
-        f"{experiencias}\n\n"
-        "### Formación Académica (input)\n"
-        f"{formacion}\n\n"
-        "### Habilidades brutas (input)\n"
-        f"{request.habilidades}\n"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Helpers de parseo robustos
-# ---------------------------------------------------------------------------
-_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
-
-
-def _extract_json(raw: str) -> Optional[Any]:
-    if not raw:
-        return None
-
-    candidates: List[str] = []
-    candidates.append(raw.strip())
-
-    fence_match = _JSON_FENCE_RE.search(raw)
-    if fence_match:
-        candidates.append(fence_match.group(1).strip())
-
-    # buscar el primer {...} o [...] balanceado
-    for opener, closer in [("{", "}"), ("[", "]")]:
-        first = raw.find(opener)
-        last = raw.rfind(closer)
-        if first != -1 and last != -1 and last > first:
-            candidates.append(raw[first:last + 1])
-
-    for cand in candidates:
-        cand = cand.strip()
-        if not cand:
-            continue
-        try:
-            return json.loads(cand)
-        except json.JSONDecodeError:
-            continue
-    return None
-
-
-async def _invoke_json_prompt(
-    user_prompt: str,
-    *,
-    user_id: str,
-    temperature: float = 0.2,
-) -> Any:
-    llm = get_deterministic_llm()
-    if llm is None:
-        raise RuntimeError("El servicio de IA no está disponible: falta configuración de Gemini.")
-
-    # forzamos temperature baja solo para esta llamada
+def _get_matching_job_offers(query: str, k: int = 3) -> str:
+    """
+    Busca ofertas de trabajo reales en la base de datos vectorial (ChromaDB)
+    para usarlas como referencia/contexto de optimización.
+    """
     try:
-        llm = llm.bind(temperature=temperature)
-    except Exception:
-        pass
+        if not os.path.exists(POINTER_PATH):
+            logger.warning("No se encontró el puntero de base de datos activa en active_pointer.json")
+            return ""
 
-    callback = AsyncObservabilityCallback(user_id=user_id)
+        with open(POINTER_PATH, "r") as f:
+            active_store = json.load(f).get("active", "blue")
 
-    try:
-        response = await asyncio.wait_for(
-            llm.ainvoke(
-                [
-                    SystemMessage(content=ATS_SYSTEM_POLICY),
-                    HumanMessage(content=user_prompt),
-                ],
-                config={"callbacks": [callback]},
-            ),
-            timeout=settings.LLM_TIMEOUT,
-        )
-    except asyncio.TimeoutError:
-        logger.error("Timeout en llamada parcial al LLM")
-        raise TimeoutError("La IA está tardando demasiado. Intenta nuevamente.")
+        vector_dir = os.path.join(DATA_DIR, f"vector_store_{active_store}")
+        if not os.path.exists(vector_dir):
+            logger.warning(f"No existe el directorio de la base de datos vectorial: {vector_dir}")
+            return ""
+
+        logger.info(f"RAG: Cargando base de datos activa: [{active_store.upper()}] para búsqueda")
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        db = Chroma(persist_directory=vector_dir, embedding_function=embeddings)
+
+        # Buscar las mejores k coincidencias
+        results = db.similarity_search(query, k=k)
+        if not results:
+            logger.warning("RAG: No se encontraron ofertas coincidentes")
+            return ""
+
+        context_parts = []
+        for idx, doc in enumerate(results):
+            area = doc.metadata.get("area_trabajo", "General")
+            context_parts.append(f"Oferta #{idx+1} (Área: {area}):\n{doc.page_content}\n")
+
+        logger.info(f"RAG: Se encontraron {len(context_parts)} ofertas de referencia")
+        return "\n".join(context_parts)
     except Exception as e:
-        msg = str(e)
-        if _is_quota_error(msg):
-            raise QuotaExceededError("La cuota de la API se ha agotado.")
-        raise RuntimeError(f"Falla en el servicio de IA: {msg}")
+        logger.error(f"Error al realizar la búsqueda vectorial RAG: {e}", exc_info=True)
+        return ""
 
-    raw = getattr(response, "content", "") or ""
-    return _extract_json(raw)
-
-
-# ---------------------------------------------------------------------------
-# Prompts por bloque
-# ---------------------------------------------------------------------------
-def _prompt_personal(request: CVRequest, context: str) -> str:
-    p = request.personal
-    return (
-        f"{context}\n\n"
-        "## TAREA\n"
-        "Optimiza la sección de información personal del candidato para ATS. "
-        "Mantén los datos EXACTOS que entrega el candidato (no inventes, no cambies "
-        "teléfono, email, RUT, LinkedIn ni ciudad), lo que puedes cambiar si se amerita es la profesión. Devuelve un JSON con esta forma:\n\n"
-        "{\n"
-        '  "nombre_completo": string,\n'
-        '  "profesion": string,\n'
-        '  "email": string,\n'
-        '  "telefono": string,\n'
-        '  "linkedin": string,\n'
-        '  "rut": string,\n'
-        '  "ciudad": string\n'
-        "}\n\n"
-        "Datos crudos del candidato:\n"
-        f"- Nombre: {p.nombre_completo}\n"
-        f"- Profesión: {p.profesion}\n"
-        f"- Email: {p.email}\n"
-        f"- Teléfono: {p.telefono}\n"
-        f"- LinkedIn: {p.linkedin}\n"
-        f"- RUT: {p.rut}\n"
-        f"- Ciudad: {p.ciudad}\n"
-    )
-
-
-def _prompt_perfil(request: CVRequest, context: str) -> str:
-    pf = request.perfil
-    return (
-        f"{context}\n\n"
-        "## TAREA\n"
-        "Reescribe la sección de perfil profesional para ATS. La propuesta de valor "
-        "debe tener entre 3 y 5 oraciones impactantes que resuman la carrera del candidato. "
-        "Mantén los años de experiencia tal como el candidato los declara. Devuelve JSON:\n\n"
-        "{\n"
-        '  "anios_experiencia": integer,\n'
-        '  "experticia": string,\n'
-        '  "propuesta_valor": string\n'
-        "}\n\n"
-        "Datos crudos:\n"
-        f"- Años de experiencia: {pf.anios_experiencia}\n"
-        f"- Áreas de experticia: {pf.experticia}\n"
-        f"- Propuesta de valor: {pf.propuesta_valor}\n"
-    )
-
-
-def _prompt_experiencia(idx: int, exp, context: str) -> str:
-    return (
-        f"{context}\n\n"
-        "## TAREA\n"
-        f"Optimiza la experiencia #{idx + 1} del candidato. Descripción debe tener al menos "
-        "2-3 oraciones con verbos de acción. Los logros deben comenzar con un verbo de acción "
-        "e idealmente incluir métricas. No inventes empresas ni fechas. Devuelve JSON:\n\n"
-        "{\n"
-        '  "cargo": string,\n'
-        '  "empresa": string,\n'
-        '  "pais": string,\n'
-        '  "periodo": string,\n'
-        '  "descripcion": string,\n'
-        '  "logros": string\n'
-        "}\n\n"
-        "Datos crudos:\n"
-        f"- Cargo: {exp.cargo}\n"
-        f"- Empresa: {exp.empresa}\n"
-        f"- País: {exp.pais}\n"
-        f"- Periodo: {exp.periodo}\n"
-        f"- Descripción: {exp.descripcion}\n"
-        f"- Logros: {exp.logros}\n"
-    )
-
-
-def _prompt_formacion(idx: int, edu, context: str) -> str:
-    return (
-        f"{context}\n\n"
-        "## TAREA\n"
-        f"Optimiza la formación #{idx + 1}. Mantén título, institución y periodo exactos. "
-        "Si el título es muy informal, normalízalo a la nomenclatura estándar. Devuelve JSON:\n\n"
-        "{\n"
-        '  "titulo": string,\n'
-        '  "institucion": string,\n'
-        '  "periodo": string\n'
-        "}\n\n"
-        "Datos crudos:\n"
-        f"- Título: {edu.titulo}\n"
-        f"- Institución: {edu.institucion}\n"
-        f"- Periodo: {edu.periodo}\n"
-    )
-
-
-def _prompt_habilidades(request: CVRequest, context: str) -> str:
-    return (
-        f"{context}\n\n"
-        "## TAREA\n"
-        "Consolida las habilidades del candidato en un único string optimizado para ATS, "
-        "organizado por categorías (técnicas, blandas, herramientas, idiomas). "
-        "Usa el formato 'Categoría: habilidad1, habilidad2, ...' separado por saltos de línea. "
-        "No inventes habilidades que no estén en el input. Devuelve un JSON con la forma:\n\n"
-        "{ \"habilidades\": string }\n\n"
-        f"Habilidades crudas del candidato:\n{request.habilidades}\n"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Validación + ensamblaje
-# ---------------------------------------------------------------------------
-def _safe_str(value: Any, default: str = "") -> str:
-    if value is None:
-        return default
-    return str(value).strip() or default
-
-
-def _safe_int(value: Any, default: int = 0) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _assemble_cv(
-    request: CVRequest,
-    personal_data: Optional[dict],
-    perfil_data: Optional[dict],
-    experiencias_data: List[Optional[dict]],
-    formacion_data: List[Optional[dict]],
-    habilidades_data: Optional[dict],
-) -> CVResponse:
-    p_src = request.personal
-    personal = personal_data or {}
-    personal_final = {
-        "nombre_completo": _safe_str(personal.get("nombre_completo"), p_src.nombre_completo),
-        "profesion":       _safe_str(personal.get("profesion"), p_src.profesion),
-        "email":           _safe_str(personal.get("email"), p_src.email),
-        "telefono":        _safe_str(personal.get("telefono"), p_src.telefono),
-        "linkedin":        _safe_str(personal.get("linkedin"), p_src.linkedin),
-        "rut":             _safe_str(personal.get("rut"), p_src.rut),
-        "ciudad":          _safe_str(personal.get("ciudad"), p_src.ciudad),
-    }
-
-    pf_src = request.perfil
-    perfil = perfil_data or {}
-    perfil_final = {
-        "anios_experiencia": _safe_int(perfil.get("anios_experiencia"), pf_src.anios_experiencia),
-        "experticia":        _safe_str(perfil.get("experticia"), pf_src.experticia),
-        "propuesta_valor":   _safe_str(perfil.get("propuesta_valor"), pf_src.propuesta_valor),
-    }
-
-    experiencias_final = []
-    for idx, exp_src in enumerate(request.experiencias):
-        data = experiencias_data[idx] if idx < len(experiencias_data) else None
-        data = data or {}
-        experiencias_final.append({
-            "cargo":       _safe_str(data.get("cargo"), exp_src.cargo),
-            "empresa":     _safe_str(data.get("empresa"), exp_src.empresa),
-            "pais":        _safe_str(data.get("pais"), exp_src.pais),
-            "periodo":     _safe_str(data.get("periodo"), exp_src.periodo),
-            "descripcion": _safe_str(data.get("descripcion"), exp_src.descripcion),
-            "logros":      _safe_str(data.get("logros"), exp_src.logros),
-        })
-
-    formacion_final = []
-    for idx, edu_src in enumerate(request.formacion):
-        data = formacion_data[idx] if idx < len(formacion_data) else None
-        data = data or {}
-        formacion_final.append({
-            "titulo":      _safe_str(data.get("titulo"), edu_src.titulo),
-            "institucion": _safe_str(data.get("institucion"), edu_src.institucion),
-            "periodo":     _safe_str(data.get("periodo"), edu_src.periodo),
-        })
-
-    habilidades = _safe_str(
-        (habilidades_data or {}).get("habilidades"),
-        request.habilidades,
-    )
-
-    return CVResponse(
-        personal=personal_final,             
-        perfil=perfil_final,                  
-        experiencias=experiencias_final,      
-        formacion=formacion_final,            
-        habilidades=habilidades,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Orquestador
-# ---------------------------------------------------------------------------
 async def generate_cv(request: CVRequest) -> CVResponse:
-    logger.info(
-        f"Generando CV multi-prompt para user_id={request.user_id} "
-        f"con modelo={settings.MODEL_NAME}"
-    )
+    """
+    Construye el prompt para el LLM y devuelve la respuesta estructurada del CV.
+    Utiliza LangChain para invocar el modelo con .ainvoke y registrar el callback.
+    """
+    llm = get_deterministic_llm()
+    modelo_con_formato = llm.with_structured_output(CVResponse)
+    observability_callback = AsyncObservabilityCallback(user_id=request.user_id)
 
-    context = _build_general_context(request)
+    # 1. Buscar ofertas de trabajo coincidentes en la base de datos vectorial
+    query = f"{request.personal.profesion} {request.perfil.experticia} {request.habilidades}"
+    target_jobs_context = _get_matching_job_offers(query, k=3)
 
-    async def safe_personal():
-        try:
-            return await _invoke_json_prompt(
-                _prompt_personal(request, context),
-                user_id=request.user_id,
-            )
-        except (QuotaExceededError, TimeoutError):
-            raise
-        except Exception as e:
-            logger.warning(f"Fallback en personal: {e}")
-            return None
-
-    async def safe_perfil():
-        try:
-            return await _invoke_json_prompt(
-                _prompt_perfil(request, context),
-                user_id=request.user_id,
-            )
-        except (QuotaExceededError, TimeoutError):
-            raise
-        except Exception as e:
-            logger.warning(f"Fallback en perfil: {e}")
-            return None
-
-    async def safe_exp(idx, exp):
-        try:
-            return await _invoke_json_prompt(
-                _prompt_experiencia(idx, exp, context),
-                user_id=request.user_id,
-            )
-        except (QuotaExceededError, TimeoutError):
-            raise
-        except Exception as e:
-            logger.warning(f"Fallback en experiencia #{idx + 1}: {e}")
-            return None
-
-    async def safe_edu(idx, edu):
-        try:
-            return await _invoke_json_prompt(
-                _prompt_formacion(idx, edu, context),
-                user_id=request.user_id,
-            )
-        except (QuotaExceededError, TimeoutError):
-            raise
-        except Exception as e:
-            logger.warning(f"Fallback en formación #{idx + 1}: {e}")
-            return None
-
-    async def safe_habilidades():
-        try:
-            return await _invoke_json_prompt(
-                _prompt_habilidades(request, context),
-                user_id=request.user_id,
-            )
-        except (QuotaExceededError, TimeoutError):
-            raise
-        except Exception as e:
-            logger.warning(f"Fallback en habilidades: {e}")
-            return None
+    # 2. Construir el prompt con el contexto
+    prompt = _build_cv_prompt(request, target_jobs_context)
+    logger.info(f"Generando CV para user_id={request.user_id} con modelo={settings.MODEL_NAME}")
 
     try:
-        (
-            personal_data,
-            perfil_data,
-            experiencias_data,
-            formacion_data,
-            habilidades_data,
-        ) = await asyncio.gather(
-            safe_personal(),
-            safe_perfil(),
-            asyncio.gather(*(safe_exp(i, e) for i, e in enumerate(request.experiencias))),
-            asyncio.gather(*(safe_edu(i, e) for i, e in enumerate(request.formacion))),
-            safe_habilidades(),
+        respuesta = await asyncio.wait_for(
+            modelo_con_formato.ainvoke(
+                prompt,
+                config={"callbacks": [observability_callback]}
+            ),
+            timeout=settings.LLM_TIMEOUT
         )
+
+        if isinstance(respuesta, CVResponse):
+            return respuesta
+
+        return CVResponse.model_validate(respuesta)
+
     except asyncio.TimeoutError:
-        logger.error("Timeout en la generación multi-prompt")
+        logger.error("Timeout en la llamada al LLM")
         raise TimeoutError("La IA está tardando demasiado en responder. Intenta nuevamente.")
     except QuotaExceededError:
         raise
@@ -447,11 +107,82 @@ async def generate_cv(request: CVRequest) -> CVResponse:
             raise QuotaExceededError("La cuota de la API se ha agotado. Intenta nuevamente más tarde.")
         raise RuntimeError(f"Falla en el servicio de IA: {error_msg}")
 
-    return _assemble_cv(
-        request=request,
-        personal_data=personal_data,
-        perfil_data=perfil_data,
-        experiencias_data=list(experiencias_data),
-        formacion_data=list(formacion_data),
-        habilidades_data=habilidades_data,
+
+def _build_cv_prompt(request: CVRequest, target_jobs_context: str = "") -> str:
+    """
+    Construye el prompt para el LLM basándose en los datos del request y el contexto RAG.
+    """
+    personal = request.personal
+    perfil = request.perfil
+
+    experiencias = []
+    for exp in request.experiencias:
+        experiencias.append(
+            f"- {exp.cargo} en {exp.empresa} ({exp.periodo}, {exp.pais}): {exp.descripcion}. Logros: {exp.logros}"
+        )
+
+    formacion = []
+    for edu in request.formacion:
+        formacion.append(f"- {edu.titulo} en {edu.institucion} ({edu.periodo})")
+
+    # Si hay contexto de ofertas de trabajo, lo agregamos al prompt
+    context_section = ""
+    if target_jobs_context:
+        context_section = (
+            "## OFERTAS DE TRABAJO REALES DE REFERENCIA (TARGET)\n"
+            f"El candidato postula al cargo/profesión de '{personal.profesion}'. A continuación se muestran ofertas de trabajo reales relacionadas. "
+            "Usa estas ofertas para extraer palabras clave, habilidades y responsabilidades clave para optimizar y adaptar el CV:\n\n"
+            f"{target_jobs_context}\n"
+        )
+
+    prompt = (
+        "Eres un experto en recursos humanos y redacción de CVs profesionales optimizados para sistemas ATS (Applicant Tracking Systems).\n"
+        "Tu tarea es generar un CV completo, sumamente profesional, optimizado y bien estructurado en español, a partir de los datos del candidato.\n\n"
+
+        "## INSTRUCCIONES GENERALES\n"
+        f"- Optimiza y adapta el contenido para que coincida y destaque frente al puesto al que postula el candidato ('{personal.profesion}').\n"
+        "- Puedes reformular, enriquecer y mejorar significativamente la redacción de la propuesta de valor, descripción de responsabilidades y habilidades.\n"
+        "- IMPORTANTE: No inventes ni modifiques datos concretos e históricos: nombres de empresas, fechas exactas, títulos académicos o instituciones educativas deben mantenerse 100% fieles a lo ingresado por el candidato. Solo mejora el texto descriptivo.\n"
+        "- Los logros deben ser redactados con verbos de acción fuertes en primera persona implícita y, si es posible, estimar o inferir métricas o impacto cuantitativo de acuerdo al contexto del rol.\n"
+        "- La propuesta de valor debe resumir la carrera del candidato en 3 a 5 oraciones con alta densidad de palabras clave relevantes.\n"
+        "- Responde ÚNICAMENTE con el JSON estructurado según el esquema CVResponse. Sin explicaciones, sin markdown, sin texto adicional.\n\n"
+
+        + context_section +
+
+        "## DATOS DEL CANDIDATO (INPUT)\n\n"
+
+        "### Información Personal\n"
+        f"- Nombre completo: {personal.nombre_completo}\n"
+        f"- Profesión / Cargo Objetivo: {personal.profesion}\n"
+        f"- Email: {personal.email}\n"
+        f"- Teléfono: {personal.telefono}\n"
+        f"- LinkedIn: {personal.linkedin}\n"
+        f"- RUT: {personal.rut}\n"
+        f"- Ciudad: {personal.ciudad}\n\n"
+
+        "### Perfil Profesional\n"
+        f"- Años de experiencia: {perfil.anios_experiencia}\n"
+        f"- Área de experticia: {perfil.experticia}\n"
+        f"- Propuesta de valor (borrador del candidato): {perfil.propuesta_valor}\n\n"
+
+        "### Experiencias Laborales\n"
+        + "\n".join(experiencias)
+        + "\n\n"
+
+        "### Formación Académica\n"
+        + "\n".join(formacion)
+        + "\n\n"
+
+        "### Habilidades (input del candidato)\n"
+        + request.habilidades
+        + "\n\n"
+
+        "## CRITERIOS ATS A APLICAR\n"
+        "1. Incorpora palabras clave relevantes para el cargo objetivo de forma natural.\n"
+        "2. Redacta las descripciones de tareas usando verbos de acción (por ejemplo: Lideré, Coordiné, Optimicé, Diseñé, etc.).\n"
+        "3. La sección de habilidades debe ser categorizada y estructurada para fácil lectura por los ATS.\n"
+        "4. Asegura coherencia y elimina modismos informales o lenguaje coloquial, manteniéndolo profesional.\n\n"
+
+        "Genera ahora el JSON completo siguiendo el esquema CVResponse."
     )
+    return prompt
