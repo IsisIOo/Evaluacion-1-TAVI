@@ -12,6 +12,10 @@ from app.core.observability import AsyncObservabilityCallback
 from app.schemas.cv_request import CVRequest
 from app.schemas.cv_response import CVResponse
 
+import os
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,6 +50,52 @@ ATS_SYSTEM_POLICY = (
     "- Devolver EXCLUSIVAMENTE un JSON válido, sin markdown, sin ```json, sin explicaciones."
 )
 
+def _get_relevant_jobs(request: CVRequest) -> str:
+    """
+    Busca las 3 ofertas laborales más afines al usuario en la base de datos vectorial activa.
+    """
+    # 1. Armar la "pregunta" usando la experticia y habilidades del usuario
+    query = f"Experiencia en: {request.perfil.experticia}. Habilidades: {request.habilidades}"
+    
+    # 2. Configurar rutas hacia la carpeta data/
+    # Subimos 3 niveles desde app/services/llm_service.py -> app/services -> app -> raíz
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    data_dir = os.path.join(base_dir, "data")
+    pointer_path = os.path.join(data_dir, "active_pointer.json")
+    
+    # 3. Leer el puntero Blue/Green
+    active_store = "blue"
+    if os.path.exists(pointer_path):
+        try:
+            with open(pointer_path, "r") as f:
+                data = json.load(f)
+                active_store = data.get("active", "blue")
+        except Exception as e:
+            logger.warning(f"No se pudo leer el puntero, usando blue por defecto: {e}")
+            
+    vector_dir = os.path.join(data_dir, f"vector_store_{active_store}")
+    
+    # 4. Conectar al RAG y buscar (Top K = 3)
+    try:
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        db = Chroma(persist_directory=vector_dir, embedding_function=embeddings)
+        
+        resultados = db.similarity_search(query, k=3)
+        
+        if not resultados:
+            return "No se encontraron ofertas laborales de contexto."
+            
+        # 5. Formatear los resultados para el Prompt Aumentado
+        contexto_ofertas = "## OFERTAS LABORALES (Usa EXCLUSIVAMENTE su terminología para optimizar el CV):\n\n"
+        for i, doc in enumerate(resultados):
+            area = doc.metadata.get("area_trabajo", "General")
+            contexto_ofertas += f"### Oferta {i+1} (Área: {area})\n{doc.page_content}\n\n"
+            
+        return contexto_ofertas
+        
+    except Exception as e:
+        logger.error(f"Error al buscar en el RAG: {e}")
+        return "Sin contexto de ofertas laborales."
 
 def _build_general_context(request: CVRequest) -> str:
     personal = request.personal
@@ -159,6 +209,18 @@ async def _invoke_json_prompt(
         raise RuntimeError(f"Falla en el servicio de IA: {msg}")
 
     raw = getattr(response, "content", "") or ""
+    
+    # FIX: Si Gemini devuelve una lista de bloques, extraemos el texto
+    if isinstance(raw, list):
+        if len(raw) > 0 and isinstance(raw[0], dict) and "text" in raw[0]:
+            raw = raw[0]["text"]
+        elif len(raw) > 0 and isinstance(raw[0], str):
+            raw = "".join(raw)
+        else:
+            raw = str(raw)
+    elif not isinstance(raw, str):
+        raw = str(raw)
+
     return _extract_json(raw)
 
 
