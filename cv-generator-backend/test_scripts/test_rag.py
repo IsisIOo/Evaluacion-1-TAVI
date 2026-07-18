@@ -1,49 +1,37 @@
-import json
 import os
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_chroma import Chroma
+import sys
 
+# 1. Configurar el path para que Python encuentre el módulo 'app'
 # Subimos un nivel desde test_scripts hacia la raíz del backend
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+sys.path.append(BASE_DIR)
 
-# 1. Rutas a la base de datos
-DATA_DIR = os.path.join(BASE_DIR, "data")
-POINTER_PATH = os.path.join(DATA_DIR, "active_pointer.json")
+# 2. Importar la nueva función de recuperación desde tu servicio
+from app.services.llm_service import _get_matching_job_offers
 
 def main():
-    print("- Iniciando prueba de búsqueda en el RAG (Local)...\n")
+    print("🤖 Iniciando prueba aislada del Retriever (RAG)...\n")
 
-    # 2. Leer qué base de datos está activa actualmente
-    if not os.path.exists(POINTER_PATH):
-        print("❌ No se encontró el puntero. Corre update_rag.py primero.")
-        return
-
-    with open(POINTER_PATH, "r") as f:
-        active_store = json.load(f).get("active", "blue")
+    # 3. Simular la query exacta que construye tu API usando la concatenación
+    # (Profesión + Experticia + Habilidades)
+    query_prueba = "Desarrollador Backend Desarrollo web y APIs Python, Bases de Datos, Trabajo en equipo"
     
-    vector_dir = os.path.join(DATA_DIR, f"vector_store_{active_store}")
-    print(f"- Conectando a la base de datos activa: [{active_store.upper()}]")
+    print(f"🗣️ Buscando ofertas para la query: '{query_prueba}'\n")
 
-    # 3. Cargar el modelo local
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    db = Chroma(persist_directory=vector_dir, embedding_function=embeddings)
+    # 4. Ejecutar la función
+    resultado = _get_matching_job_offers(query=query_prueba, k=3)
 
-    print(f"- La base de datos tiene actualmente {db._collection.count()} ofertas guardadas.\n")
-
-    # ---------------------------------------------------------
-    # ZONA DE PRUEBAS
-    # ---------------------------------------------------------
-    pregunta = "Busco un trabajo donde pueda usar mis conocimientos de Python, bases de datos SQL y creación de APIs."
+    # 5. Imprimir los resultados devueltos por el sistema Blue/Green
+    print("=" * 70)
+    print("📄 CONTEXTO RECUPERADO LISTO PARA EL LLM:")
+    print("=" * 70)
     
-    print(f"🗣️  Buscando ofertas para el perfil: '{pregunta}'\n")
-
-    # Pedimos los 3 mejores resultados (k=3)
-    resultados = db.similarity_search(pregunta, k=3)
-
-    for i, doc in enumerate(resultados):
-        print(f"- RESULTADO {i+1} (Área: {doc.metadata.get('area_trabajo')}):")
-        print(f"   {doc.page_content}\n")
-        print("-" * 50)
+    if resultado:
+        print(resultado)
+    else:
+        print("❌ No se encontraron ofertas o hubo un error en la conexión.")
+        
+    print("=" * 70)
 
 if __name__ == "__main__":
     main()
