@@ -4,6 +4,29 @@
       <v-col cols="12" md="10" lg="8">
         <h2 class="text-h4 mb-6 text-center">Formulario de Generación de CV</h2>
 
+        <!-- ========================================== -->
+        <!-- ZONA DE DEBUG: SIMULAR POSTMAN + IA        -->
+        <!-- (Atajo: Ctrl + Shift + D)                  -->
+        <!-- ========================================== -->
+        <v-card v-if="showDebugZone" class="mb-6 pa-4 border-dashed" style="border-color: #ff5252; border-width: 2px;" variant="outlined">
+          <div class="d-flex align-center mb-2">
+            <v-icon color="error" class="mr-2">mdi-robot-outline</v-icon>
+            <h3 class="text-error mb-0">Zona de Debug: Ejecutar IA desde JSON</h3>
+          </div>
+          <p class="text-caption mb-3">Pega el JSON de entrada (Request). El sistema llenará el formulario y enviará los datos automáticamente a tu backend (RAG + LLM).</p>
+          <v-textarea
+            v-model="debugJson"
+            label="Pega el JSON de entrada aquí..."
+            variant="outlined"
+            rows="5"
+            bg-color="#fff8f8"
+          />
+          <v-btn color="error" @click="ejecutarProcesoIA" :loading="loading">
+            Generar CV con IA
+          </v-btn>
+        </v-card>
+        <!-- ========================================== -->
+
         <v-stepper v-model="step" :mobile="false">
           <v-stepper-header>
             <template v-for="n in steps.length" :key="n">
@@ -628,6 +651,8 @@ const paises = [
 export default {
   name: 'FormView',
   data: () => ({
+    showDebugZone: false,
+    debugJson: '',
     step: 1,
     loading: false,
     valid: false,
@@ -758,7 +783,63 @@ export default {
       },
     },
   },
+
+  mounted() {
+    // Cuando el componente carga, empezamos a escuchar el teclado
+    window.addEventListener('keydown', this.detectarAtajoDebug);
+  },
+  beforeUnmount() {
+    // Cuando cambiamos de página, apagamos el escuchador
+    window.removeEventListener('keydown', this.detectarAtajoDebug);
+  },
+
   methods: {
+    detectarAtajoDebug(event) {
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'd') {
+        event.preventDefault();
+        this.showDebugZone = !this.showDebugZone;
+      }
+    },
+    
+    async ejecutarProcesoIA() {
+      try {
+        if (!this.debugJson.trim()) {
+          alert('El textarea está vacío. Pega un JSON de entrada primero.');
+          return;
+        }
+        
+        // Convertimos el JSON pegado
+        const inputData = JSON.parse(this.debugJson);
+        
+        // Llenamos el formulario
+        if (inputData.personal) this.form.personal = { ...this.form.personal, ...inputData.personal };
+        if (inputData.perfil) this.form.perfil = { ...this.form.perfil, ...inputData.perfil };
+        
+        // Aseguramos que los arreglos se copien correctamente para evitar errores en Vue
+        if (inputData.experiencias) {
+          this.form.experiencias = inputData.experiencias.map(exp => ({ ...exp }));
+        }
+        if (inputData.formacion) {
+          this.form.formacion = inputData.formacion.map(edu => ({ ...edu }));
+        }
+        if (inputData.habilidades) this.form.habilidades = inputData.habilidades;
+
+        // Saltamos visualmente al paso 5 y marcamos el checkbox de confirmación
+        this.step = 5;
+        this.valid = true;
+
+        await this.$nextTick(); 
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        // Llamamos
+        await this.submitForm();
+        
+      } catch (error) {
+        alert('Error: El texto pegado no es un JSON válido.');
+        console.error('Error parseando JSON de entrada:', error);
+      }
+    },
+    
     formatPeriodo(exp) {
       const ini = monthLabel(exp.fecha_inicio);
       if (!ini) return '';
