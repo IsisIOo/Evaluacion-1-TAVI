@@ -23,22 +23,48 @@
             Descargar CV PDF
         </v-btn>
 
-        <v-card v-if="pdfUrl">
+        <v-card v-if="cvDat && !loading" class="mt-4">
             <v-card-title>Vista Previa del CV</v-card-title>
             <v-card-text>
-                <iframe 
-                    :src="pdfUrl" 
-                    width="100%" 
-                    height="600px" 
-                    frameborder="0"
-                    type="application/pdf"
-                    style="border: none;"
-                >
-                </iframe>
+                <div class="cv-preview pa-6">
+                    <div class="text-center mb-4">
+                        <h1 class="text-h4 font-weight-bold">{{ cvDat.personal.nombre_completo }}</h1>
+                        <h2 class="text-h6 text-medium-emphasis">{{ cvDat.personal.profesion }}</h2>
+                        <p class="text-caption text-grey">
+                            {{ cvDat.personal.email }} | {{ cvDat.personal.telefono }} | {{ cvDat.personal.ciudad }}
+                        </p>
+                        <p class="text-caption text-grey">
+                            Rut: {{ cvDat.personal.rut }}{{ cvDat.personal.linkedin ? ' | LinkedIn: ' + cvDat.personal.linkedin : '' }}
+                        </p>
+                    </div>
+
+                    <v-divider class="mb-4" />
+
+                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2">Perfil Profesional</h3>
+                    <p class="text-body-2 mb-1">{{ cvDat.perfil.propuesta_valor }}</p>
+                    <p class="text-body-2 mb-1">Años de experiencia: {{ cvDat.perfil.anios_experiencia }}</p>
+                    <p class="text-body-2 mb-4">Experticia: {{ cvDat.perfil.experticia }}</p>
+
+                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2">Experiencia Laboral</h3>
+                    <div v-for="(exp, i) in cvDat.experiencias" :key="i" class="mb-3">
+                        <p class="text-body-2 font-weight-bold mb-0">{{ exp.cargo }} - {{ exp.empresa }}</p>
+                        <p class="text-caption font-italic mb-0">{{ exp.periodo }} | {{ exp.pais }}</p>
+                        <p class="text-body-2 mb-0">Funciones: {{ exp.descripcion }}</p>
+                        <p v-if="exp.logros" class="text-body-2 mb-0">Logros: {{ exp.logros }}</p>
+                    </div>
+
+                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2">Formación Académica</h3>
+                    <p v-for="(form, i) in cvDat.formacion" :key="i" class="text-body-2 mb-1">
+                        {{ form.titulo }} en {{ form.institucion }} ({{ form.periodo }})
+                    </p>
+
+                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2 mt-4">Habilidades</h3>
+                    <p class="text-body-2">{{ cvDat.habilidades }}</p>
+                </div>
             </v-card-text>
         </v-card>
 
-        <v-alert v-else-if="!loading && !cvDat" type="error" class="mt-4">
+        <v-alert v-if="!loading && !cvDat" type="error" class="mt-4">
             No se pudieron cargar los datos para generar el CV.
         </v-alert>
     </v-container>
@@ -57,8 +83,7 @@
         data () {
             return {
                 cvDat: null,
-                loading: false,
-                pdfUrl: null
+                loading: false
             };
         },
 
@@ -186,34 +211,7 @@
             },
 
 
-            /* preview() {
-                return new Promise((resolve) => {
-                    try{
-                        const format = this.getFormat();
-                        if (!format){
-                            return resolve();
-                        }
 
-                        const pdfpreview = pdfMake.createPdf(format);
-                        
-                        //getDataUrl por getBlob
-                        pdfpreview.getBlob((blob) => {
-                            
-                            // URL para el iframe
-                            this.pdfUrl = URL.createObjectURL(blob);
-                            
-                            console.log("PDF URL generada (Blob)");
-                            resolve();
-                        });
-                    } 
-                    catch(error){
-                        console.error("Error a generar el PDF", error);
-                        resolve();
-                    }
-                    
-                });
-            },
- */
             generatePDF(){
                 if (!this.cvDat){
                     return;
@@ -234,10 +232,6 @@
             }
         },
 
-        unmounted() {
-            if (this.pdfUrl){
-                URL.revokeObjectURL(this.pdfUrl);
-            }
-        }
+
     }
 </script>

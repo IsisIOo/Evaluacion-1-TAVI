@@ -128,5 +128,4 @@ def iniciar_scraper():
         browser.close()
 
 if __name__ == "__main__":
-    print("=== probando cronjob ===")
-    # iniciar_scraper()
+    iniciar_scraper()
