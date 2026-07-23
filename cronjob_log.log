@@ -1,2 +1,4 @@
-=== probando cronjob ===
-Error: PYTHON_PATH is not defined in .env file!
+=== Ejecutando Scraper ===
+=== corriendo scraper ===
+=== Ejecutando Actualización de RAG ===
+=== corriendo update rag ===
