@@ -22,5 +22,15 @@ if [ -z "$PYTHON_PATH" ]; then
     exit 1
 fi
 
-# 3. ejecuta el script
+# 3. ejecuta el scraper
+echo "=== Ejecutando Scraper ==="
 "$PYTHON_PATH" cv-generator-backend/pipeline/scraper.py
+
+# 4. ejecuta la actualización del RAG solo si el scraper terminó con éxito (código de salida 0)
+if [ $? -eq 0 ]; then
+    echo "=== Ejecutando Actualización de RAG ==="
+    "$PYTHON_PATH" cv-generator-backend/pipeline/update_rag.py
+else
+    echo "Error: scraper.py falló. Se omite la actualización del RAG."
+    exit 1
+fi
