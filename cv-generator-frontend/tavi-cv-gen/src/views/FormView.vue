@@ -795,7 +795,7 @@ export default {
 
   methods: {
     detectarAtajoDebug(event) {
-      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'd') {
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'y') {
         event.preventDefault();
         this.showDebugZone = !this.showDebugZone;
       }
