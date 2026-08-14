@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from app.db.session import connect_to_mongo, close_mongo_connection
+from app.db.cv_repository import CVRepository
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.api import api_router
 
@@ -21,6 +22,12 @@ async def lifespan(app: FastAPI):
     # logica de inicio
     logger.info("Iniciando la aplicación FastAPI")
     await connect_to_mongo() # abre la conexión a MongoDB al iniciar la aplicación
+    # índice TTL para que MongoDB elimine automáticamente los CVs vencidos
+    # (política de retención para proteger los datos personales)
+    try:
+        await CVRepository.ensure_retention_index()
+    except Exception as e:
+        logger.warning(f"No se pudo crear el índice TTL de retención: {e}")
     logger.info("Aplicación FastAPI iniciada correctamente")
     
     yield # aquí es donde se ejecutan los endpoints y la lógica de la aplicación mientras está corriendo

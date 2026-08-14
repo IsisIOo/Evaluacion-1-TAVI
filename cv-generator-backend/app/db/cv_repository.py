@@ -4,7 +4,9 @@ Repositorio para operaciones CRUD de CVs en MongoDB
 import logging
 from typing import List, Optional
 from bson import ObjectId
-from datetime import datetime
+from datetime import timedelta
+from app.core.config import settings
+from app.core.datetime_utils import utcnow
 from app.db.session import get_db
 from app.db.models import CVDocument
 from app.schemas.cv_response import CVResponse
@@ -36,6 +38,9 @@ class CVRepository:
             collection = db[CVRepository.COLLECTION_NAME]
             
             # Construir documento para MongoDB
+            created_at = utcnow()
+            expires_at = created_at + timedelta(days=settings.CV_RETENTION_DAYS)
+
             cv_document = {
                 "user_id": user_id,
                 "personal": cv_data.personal.model_dump(),
@@ -43,8 +48,9 @@ class CVRepository:
                 "experiencias": [exp.model_dump() for exp in cv_data.experiencias],
                 "formacion": [form.model_dump() for form in cv_data.formacion],
                 "habilidades": cv_data.habilidades,
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow(),
+                "created_at": created_at,
+                "updated_at": created_at,
+                "expires_at": expires_at,
             }
             
             result = await collection.insert_one(cv_document)
@@ -132,7 +138,7 @@ class CVRepository:
                 "experiencias": [exp.model_dump() for exp in cv_data.experiencias],
                 "formacion": [form.model_dump() for form in cv_data.formacion],
                 "habilidades": cv_data.habilidades,
-                "updated_at": datetime.utcnow(),
+                "updated_at": utcnow(),
             }
             
             result = await collection.update_one(
@@ -177,4 +183,54 @@ class CVRepository:
                 
         except Exception as e:
             logger.error(f"Error al eliminar CV {cv_id}: {e}")
+            raise
+
+    @staticmethod
+    async def ensure_retention_index() -> str:
+        """
+        Crea (o actualiza) el índice TTL sobre created_at para que MongoDB
+        elimine automáticamente los CVs vencidos y proteja los datos personales.
+
+        El periodo de retención se toma de settings.CV_RETENTION_DAYS, por lo
+        que cambiar la variable de entorno y reiniciar actualiza el TTL.
+        """
+        try:
+            db = get_db()
+            collection = db[CVRepository.COLLECTION_NAME]
+            expire_after_seconds = settings.CV_RETENTION_DAYS * 86400
+            index_name = await collection.create_index(
+                "created_at",
+                name="cv_created_at_ttl",
+                expireAfterSeconds=expire_after_seconds,
+                background=True,
+            )
+            logger.info(
+                f"Índice TTL de retención listo: {index_name} "
+                f"(expira después de {settings.CV_RETENTION_DAYS} días)"
+            )
+            return index_name
+        except Exception as e:
+            logger.error(f"Error al crear el índice TTL de retención: {e}")
+            raise
+
+    @staticmethod
+    async def delete_expired_cvs() -> int:
+        """
+        Elimina manualmente todos los CVs que superaron su periodo de retención.
+        Complementa el índice TTL y se usa para limpieza bajo demanda.
+
+        Returns:
+            Cantidad de CVs eliminados.
+        """
+        try:
+            db = get_db()
+            collection = db[CVRepository.COLLECTION_NAME]
+            cutoff = utcnow() - timedelta(days=settings.CV_RETENTION_DAYS)
+            result = await collection.delete_many({"created_at": {"$lte": cutoff}})
+            logger.info(
+                f"Limpieza de CVs vencidos: {result.deleted_count} documento(s) eliminado(s)"
+            )
+            return result.deleted_count
+        except Exception as e:
+            logger.error(f"Error al eliminar CVs vencidos: {e}")
             raise

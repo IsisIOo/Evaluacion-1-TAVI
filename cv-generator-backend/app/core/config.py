@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     MONGO_URI: str = Field(..., description="URI de conexión de MongoDB")
     MONGO_DB_NAME: str = Field(default="cv_db", description="Nombre de la base de datos MongoDB")
 
+    # Política de retención de datos personales
+    CV_RETENTION_DAYS: int = Field(default=30, description="Días que un CV permanece almacenado antes de eliminarse automáticamente (protección de datos personales)")
+
     # Configuración LLM
     # OPENAI_API_KEY: str | None = Field(None, description="API key para OpenAI")
     GEMINI_API_KEY: str | None = Field(None, description="API key para acceder a modelo Gemini")

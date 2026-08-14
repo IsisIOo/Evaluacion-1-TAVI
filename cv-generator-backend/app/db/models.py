@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 from datetime import datetime
 from app.schemas.cv_response import Personal, Perfil, Experiencia, Formacion
+from app.core.datetime_utils import utcnow
 
 
 class CVDocument(BaseModel):
@@ -20,8 +21,8 @@ class CVDocument(BaseModel):
     experiencias: list[Experiencia]
     formacion: list[Formacion]
     habilidades: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
 
     class Config:
         populate_by_name = True
@@ -35,8 +36,8 @@ class UserDocument(BaseModel):
     password_hash: str = Field(..., description="Hash de la contraseña del usuario")    
     nombre: str = Field(..., description="Nombre completo del usuario")
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
 
     class Config:        
         populate_by_name = True

@@ -33,7 +33,18 @@
               {{ cv.personal?.profesion || '' }}
             </v-list-item-subtitle>
 
+            <v-list-item-subtitle v-if="cv.remaining_days !== undefined" class="mt-1">
+              <v-icon size="small" :color="expirationColor(cv.remaining_days)" class="mr-1">
+                mdi-clock-outline
+              </v-icon>
+              {{ expirationLabel(cv.remaining_days) }}
+              <span v-if="cv.expires_at" class="text-caption text-grey">— {{ formatExpiration(cv.expires_at) }}</span>
+            </v-list-item-subtitle>
+
             <template v-slot:append>
+              <v-chip v-if="cv.remaining_days !== undefined" size="small" :color="expirationColor(cv.remaining_days)">
+                {{ expirationChip(cv.remaining_days) }}
+              </v-chip>
               <v-btn icon="mdi-chevron-right" variant="text" />
             </template>
           </v-list-item>
@@ -72,6 +83,25 @@ export default {
   methods: {
     viewCv(cvId) {
       this.$router.push({ name: "pdf", params: { cvId } });
+    },
+    formatExpiration(iso) {
+      if (!iso) return "";
+      const date = new Date(iso);
+      return date.toLocaleDateString("es-CL");
+    },
+    expirationLabel(days) {
+      if (days <= 0) return "Vence hoy";
+      return `Expira en ${days} día${days === 1 ? "" : "s"}`;
+    },
+    expirationChip(days) {
+      if (days <= 0) return "Vencido";
+      return `${days}d`;
+    },
+    expirationColor(days) {
+      if (days <= 0) return "error";
+      if (days <= 3) return "error";
+      if (days <= 7) return "warning";
+      return "success";
     },
   },
 };

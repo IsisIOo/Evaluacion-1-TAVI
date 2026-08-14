@@ -23,6 +23,18 @@
             Descargar CV PDF
         </v-btn>
 
+        <v-alert
+            v-if="cvDat && cvDat.remaining_days !== undefined"
+            type="info"
+            variant="tonal"
+            class="mt-4"
+            prepend-icon="mdi-shield-lock-outline"
+        >
+            Este CV se eliminará automáticamente por protección de datos
+            el {{ formatExpiration(cvDat.expires_at) }}
+            (quedan {{ cvDat.remaining_days }} día{{ cvDat.remaining_days === 1 ? '' : 's' }}).
+        </v-alert>
+
         <v-card v-if="cvDat && !loading" class="mt-4">
             <v-card-title>Vista Previa del CV</v-card-title>
             <v-card-text>
@@ -103,7 +115,17 @@
                     } else {
                         const dLLM = window.history.state;
                         if(dLLM && dLLM.dataLlm){
-                            this.cvDat = dLLM.dataLlm.cv_data;
+                            const data = dLLM.dataLlm;
+                            this.cvDat = data.cv_data;
+                            // la respuesta de /generate trae la retención a nivel raíz
+                            if (data.remaining_days !== undefined) {
+                                this.cvDat = {
+                                    ...this.cvDat,
+                                    expires_at: data.expires_at,
+                                    remaining_seconds: data.remaining_seconds,
+                                    remaining_days: data.remaining_days,
+                                };
+                            }
                         }
                     }
 
@@ -117,13 +139,17 @@
                 }
             },
 
+            formatExpiration(iso){
+                if (!iso) return '';
+                return new Date(iso).toLocaleDateString('es-CL');
+            },
+
             getFormat(){
                 if(!this.cvDat){
                     console.warn("No hay datos para hacer el PDF");
                     return;
                 }
                 
-
                 return {
                     content: [
                         //PERSONAL
