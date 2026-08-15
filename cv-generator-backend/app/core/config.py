@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     LOCAL_MODEL_PATH: str = Field(default="models/gguf/model.gguf", description="Ruta al modelo local GGUF para LlamaCpp")
     LLM_TIMEOUT: int = Field(default=360, description="Timeout en segundos para la llamada al LLM")
     
+    # Caché y Cuotas de Tokens
+    ENABLE_SEMANTIC_CACHE: bool = Field(default=True, description="Habilitar caché de respuestas para ahorrar tokens")
+    CACHE_TTL_HOURS: int = Field(default=24, description="Tiempo de vida en horas de respuestas en caché")
+    DAILY_USER_TOKEN_LIMIT: int = Field(default=50000, description="Límite diario de tokens por usuario")
+    
     # Configuración de Pydantic para leer el .env
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -1,25 +1,74 @@
 # endpoint para manejar las solicitudes relacionadas con la generación de CVs
 import logging
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException
+from app.core.config import settings
+from app.db.session import get_db
 from app.schemas.cv_response import CVResponse
 from app.schemas.cv_request import CVRequest
 from app.services.llm_service import generate_cv, QuotaExceededError
+
 from app.db.cv_repository import CVRepository
 
 logger = logging.getLogger(__name__)
 
 cv_router = APIRouter()  # instancia del router para este endpoint
 
+async def check_user_token_quota(user_id: str):
+    """
+    Verifica si el user_id ha superado el límite diario de tokens en observability_logs.
+    """
+    if settings.DAILY_USER_TOKEN_LIMIT <= 0:
+        return
+
+    try:
+        db = get_db()
+        if db is None:
+            return
+
+        yesterday = datetime.now(timezone.utc) - timedelta(hours=24)
+        pipeline = [
+            {
+                "$match": {
+                    "user_id": user_id,
+                    "timestamp": {"$gte": yesterday},
+                    "status": "success"
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$user_id",
+                    "total_tokens_used": {"$sum": "$total_tokens"}
+                }
+            }
+        ]
+        result = await db.observability_logs.aggregate(pipeline).to_list(length=1)
+        if result:
+            used_tokens = result[0].get("total_tokens_used", 0)
+            if used_tokens >= settings.DAILY_USER_TOKEN_LIMIT:
+                logger.warning(f"Usuario {user_id} superó la cuota diaria de tokens ({used_tokens}/{settings.DAILY_USER_TOKEN_LIMIT})")
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Has alcanzado el límite diario de {settings.DAILY_USER_TOKEN_LIMIT} tokens. Intenta nuevamente más tarde."
+                )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Error al verificar la cuota diaria de tokens de {user_id}: {e}")
+
 @cv_router.post("/generate", response_model=dict)
 async def generate_cv_endpoint(request: CVRequest):
     """
     Recibe el JSON con la estructura completa del formulario desde el frontend,
-    llama al servicio LLM, guarda el CV en MongoDB y retorna la respuesta estructurada.
+    verifica cuotas, llama al servicio LLM (con caché), guarda el CV en MongoDB y retorna la respuesta.
     """
     logger.info(f"Recibida solicitud de generación de CV para el usuario_id: {request.user_id}")
 
     try:
-        # Generar CV con IA
+        # Verificar cuota diaria del usuario
+        await check_user_token_quota(request.user_id)
+
+        # Generar CV con IA (o recuperar de caché con 0 tokens)
         cv_response = await generate_cv(request)
         
         # Guardar CV en MongoDB
