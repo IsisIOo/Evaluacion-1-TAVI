@@ -253,3 +253,7 @@ Errores y logs quedan guardados en cronjob_log.log
 - [ ] Agregar opción de descargar CV como PDF
 - [ ] Agregar historial de CVs generados
 - [ ] Validación más robusta del formulario
+
+
+# ENTREGA 3
+Para usar RAGAS, crear api key de roq (https://console.groq.com) esquina superior derecha -> api key -> crear api key
