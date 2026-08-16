@@ -8,15 +8,13 @@ from langchain_core.outputs import LLMResult
 from app.core.config import settings
 from app.db.session import get_db
 
-# [Para Isidora]: esta clase se encargará de interceptar las llamadas al LLM, recoger información y guardarla
+# esta clase se encargará de interceptar las llamadas al LLM, recoger información y guardarla
 # el script tiene una forma tentativa de calcular costos, duración y tokens usados
-# puedes editarlo como quieras mientras decides que recoger, cómo recogerlo, y como guardarlo
 
 logger = logging.getLogger(__name__)
 
-# [Para Isidora]: diccionario de costos, hay que investigar, los numeros que puse me los invente
 MODEL_COST_PER_1M = {
-    "gemini-1.5-pro": {"input": 0.0004, "output": 0.0008},
+    "gemini-3.5-flash": {"input": 1.50, "output": 9.00},
 }
 
 class AsyncObservabilityCallback(AsyncCallbackHandler):

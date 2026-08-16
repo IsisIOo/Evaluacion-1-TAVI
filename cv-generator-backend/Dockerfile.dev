@@ -1,0 +1,30 @@
+FROM python:3.14-slim
+
+# JUSTIFICACIÓN 1: PYTHONUNBUFFERED=1 permite ver los logs en la terminal de Docker en tiempo real.
+# PYTHONDONTWRITEBYTECODE=1 evita que Python cree archivos .pyc innecesarios en el contenedor.
+# PLAYWRIGHT_BROWSERS_PATH asegura que los navegadores se instalen en una ruta predecible.
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+WORKDIR /app
+
+# JUSTIFICACIÓN 2: Instalar dependencias reales del SO. 
+# build-essential es necesario para compilar librerías de Python escritas en C (como bcrypt).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# JUSTIFICACIÓN 3: Instalar solo 'chromium' ahorra muchísimo espacio y tiempo de build.
+# Si necesitan firefox o webkit, quita 'chromium' del comando.
+RUN playwright install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

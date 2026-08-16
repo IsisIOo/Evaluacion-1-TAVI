@@ -1,0 +1,77 @@
+services:
+  # ---------------- FRONTEND ----------------
+  frontend:
+    build:
+      context: ./cv-generator-frontend/tavi-cv-gen
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./cv-generator-frontend/tavi-cv-gen:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      # IMPORTANTE: Vue CLI requiere que las variables empiecen con VUE_APP_
+      - VUE_APP_API_URL=http://localhost:8000
+    networks:
+      - cv_network
+    depends_on:
+      - backend
+
+  # ---------------- BACKEND ----------------
+  backend:
+    build:
+      context: ./cv-generator-backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./cv-generator-backend:/app
+    env_file:
+      - ./cv-generator-backend/.env
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/cv_database
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+    networks:
+      - cv_network
+
+  # ---------------- BASES DE DATOS ----------------
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cv_network
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+    networks:
+      - cv_network
+
+volumes:
+  mongo_data:
+  chroma_data:
+
+networks:
+  cv_network:
+    driver: bridge
