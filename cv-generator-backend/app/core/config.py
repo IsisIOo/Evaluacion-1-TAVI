@@ -18,12 +18,17 @@ class Settings(BaseSettings):
     # OPENAI_API_KEY: str | None = Field(None, description="API key para OpenAI")
     GEMINI_API_KEY: str | None = Field(None, description="API key para acceder a modelo Gemini")
     MODEL_NAME: str = Field(default="gemini-3.5-flash", description="Nombre del modelo a usar")
-    MAX_TOKENS: int = Field(default=1000, description="Máximo de tokens en la respuesta del modelo")
+    MAX_TOKENS: int = Field(default=4096, description="Máximo de tokens en la respuesta del modelo")
     TEMPERATURE: float = Field(default=0.1, description="Temperatura para la generación del modelo")
     TOP_P: float = Field(default=0.95, description="Probabilidad acumulada top-p para el muestreo del modelo")
     TOP_K: int = Field(default=40, description="Número máximo de tokens a considerar en top-k para el modelo")
     LOCAL_MODEL_PATH: str = Field(default="models/gguf/model.gguf", description="Ruta al modelo local GGUF para LlamaCpp")
     LLM_TIMEOUT: int = Field(default=360, description="Timeout en segundos para la llamada al LLM")
+    
+    # Caché y Cuotas de Tokens
+    ENABLE_SEMANTIC_CACHE: bool = Field(default=True, description="Habilitar caché de respuestas para ahorrar tokens")
+    CACHE_TTL_HOURS: int = Field(default=24, description="Tiempo de vida en horas de respuestas en caché")
+    DAILY_USER_TOKEN_LIMIT: int = Field(default=50000, description="Límite diario de tokens por usuario")
     
     # Configuración de Pydantic para leer el .env
     model_config = SettingsConfigDict(
