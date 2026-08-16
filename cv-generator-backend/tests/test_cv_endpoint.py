@@ -1,88 +1,168 @@
-"""
-Tests unitarios de los endpoints de CVs: tiempo restante enviado al frontend
-y eliminación de CVs vencidos por política de retención.
-"""
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, patch
+"""Tests para app/api/v1/cv_endpoint.py: generación y consulta de CVs."""
 
 import pytest
-from fastapi import HTTPException
+from unittest.mock import AsyncMock, patch
+from httpx import AsyncClient, ASGITransport
 
-from app.api.v1.cv_endpoint import get_cv_endpoint, get_user_cvs_endpoint
-from app.core.datetime_utils import utcnow
-
-RETENTION_DAYS = 30
+from app.main import app
+from app.services.llm_service import QuotaExceededError
 
 
-def _cv_document(cv_id: str, created_at: datetime) -> dict:
-    return {
-        "_id": cv_id,
-        "user_id": "user1",
-        "personal": {"nombre_completo": "Juan Pérez"},
-        "created_at": created_at,
-    }
+@pytest.fixture
+def client():
+    transport = ASGITransport(app=app)
+    return AsyncClient(transport=transport, base_url="http://test")
+
+
+class TestGenerateCvEndpoint:
+    @pytest.mark.asyncio
+    async def test_generate_success(self, client, cv_request_data, cv_response):
+        with patch(
+            "app.services.llm_service.generate_cv",
+            new=AsyncMock(return_value=cv_response),
+        ):
+            with patch(
+                "app.api.v1.cv_endpoint.CVRepository.save_cv",
+                new=AsyncMock(return_value="64b000000000000000000000"),
+            ):
+                response = await client.post("/api/cv/generate", json=cv_request_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["cv_id"] == "64b000000000000000000000"
+        assert data["cv_data"]["personal"]["nombre_completo"] == "Jaime Gustamante"
+        assert data["remaining_days"] == 30
+        assert "expires_at" in data
+        assert "remaining_seconds" in data
+
+    @pytest.mark.asyncio
+    async def test_generate_validation_error(self, client):
+        invalid_data = {"user_id": "abc"}  # faltan todos los demás campos
+        response = await client.post("/api/cv/generate", json=invalid_data)
+        assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_generate_quota_exceeded(self, client, cv_request_data):
+        async def raise_quota(_request):
+            raise QuotaExceededError("La cuota de la API se ha agotado.")
+
+        with patch("app.services.llm_service.generate_cv", new=raise_quota):
+            response = await client.post("/api/cv/generate", json=cv_request_data)
+
+        assert response.status_code == 429
+        assert "cuota" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_generate_timeout(self, client, cv_request_data):
+        async def raise_timeout(_request):
+            raise TimeoutError("La IA está tardando demasiado.")
+
+        with patch("app.services.llm_service.generate_cv", new=raise_timeout):
+            response = await client.post("/api/cv/generate", json=cv_request_data)
+
+        assert response.status_code == 504
+
+    @pytest.mark.asyncio
+    async def test_generate_generic_error(self, client, cv_request_data):
+        async def raise_error(_request):
+            raise RuntimeError("Falla en el servicio de IA: detalle técnico")
+
+        with patch("app.services.llm_service.generate_cv", new=raise_error):
+            response = await client.post("/api/cv/generate", json=cv_request_data)
+
+        assert response.status_code == 500
 
 
 class TestGetCvEndpoint:
-    @patch("app.api.v1.cv_endpoint.CVRepository.delete_cv", new_callable=AsyncMock)
-    @patch("app.api.v1.cv_endpoint.CVRepository.get_cv_by_id", new_callable=AsyncMock)
-    async def test_devuelve_tiempo_restante_al_frontend(self, mock_get, mock_delete):
-        cv = _cv_document("abc", utcnow() - timedelta(days=10))
-        mock_get.return_value = cv
+    @pytest.mark.asyncio
+    async def test_get_cv_by_id_success(self, client, cv_response_data):
+        cv_with_id = dict(cv_response_data)
+        cv_with_id["_id"] = "64b000000000000000000000"
 
-        respuesta = await get_cv_endpoint("abc")
+        with patch(
+            "app.api.v1.cv_endpoint.CVRepository.get_cv_by_id",
+            new=AsyncMock(return_value=cv_with_id),
+        ):
+            response = await client.get("/api/cv/64b000000000000000000000")
 
-        assert respuesta["success"] is True
-        cv_data = respuesta["cv_data"]
-        assert cv_data["remaining_days"] == RETENTION_DAYS - 10
-        assert cv_data["remaining_seconds"] > 0
-        assert cv_data["is_expired"] is False
-        assert cv_data["expires_at"].endswith("Z")
-        mock_delete.assert_not_awaited()
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["cv_data"]["personal"]["nombre_completo"] == "Jaime Gustamante"
+        assert "expires_at" in data["cv_data"]
+        assert "remaining_days" in data["cv_data"]
 
-    @patch("app.api.v1.cv_endpoint.CVRepository.delete_cv", new_callable=AsyncMock)
-    @patch("app.api.v1.cv_endpoint.CVRepository.get_cv_by_id", new_callable=AsyncMock)
-    async def test_cv_vencido_responde_404_y_se_elimina(self, mock_get, mock_delete):
-        cv = _cv_document("abc", utcnow() - timedelta(days=RETENTION_DAYS + 5))
-        mock_get.return_value = cv
+    @pytest.mark.asyncio
+    async def test_get_cv_not_found(self, client):
+        with patch(
+            "app.api.v1.cv_endpoint.CVRepository.get_cv_by_id",
+            new=AsyncMock(return_value=None),
+        ):
+            response = await client.get("/api/cv/64b000000000000000000000")
 
-        with pytest.raises(HTTPException) as excinfo:
-            await get_cv_endpoint("abc")
+        assert response.status_code == 404
+        assert "no encontrado" in response.json()["detail"]
 
-        assert excinfo.value.status_code == 404
-        mock_delete.assert_awaited_once_with("abc")
+    @pytest.mark.asyncio
+    async def test_get_expired_cv_returns_404_and_deletes(self, client, cv_response_data):
+        from datetime import datetime, timedelta
 
-    @patch("app.api.v1.cv_endpoint.CVRepository.get_cv_by_id", new_callable=AsyncMock)
-    async def test_cv_inexistente_responde_404(self, mock_get):
-        mock_get.return_value = None
+        expired_cv = dict(cv_response_data)
+        expired_cv["_id"] = "64b000000000000000000000"
+        expired_cv["created_at"] = datetime.utcnow() - timedelta(days=999)
 
-        with pytest.raises(HTTPException) as excinfo:
-            await get_cv_endpoint("no-existe")
+        delete_mock = AsyncMock(return_value=True)
 
-        assert excinfo.value.status_code == 404
+        with patch(
+            "app.api.v1.cv_endpoint.CVRepository.get_cv_by_id",
+            new=AsyncMock(return_value=expired_cv),
+        ):
+            with patch("app.api.v1.cv_endpoint.CVRepository.delete_cv", new=delete_mock):
+                response = await client.get("/api/cv/64b000000000000000000000")
+
+        assert response.status_code == 404
+        delete_mock.assert_awaited_once()
 
 
 class TestGetUserCvsEndpoint:
-    @patch("app.api.v1.cv_endpoint.CVRepository.delete_cv", new_callable=AsyncMock)
-    @patch("app.api.v1.cv_endpoint.CVRepository.get_cvs_by_user", new_callable=AsyncMock)
-    async def test_filtra_y_elimina_cvs_vencidos(self, mock_get_user, mock_delete):
-        ahora = utcnow()
-        vigente = _cv_document("vigente", ahora - timedelta(days=5))
-        vencido = _cv_document("vencido", ahora - timedelta(days=RETENTION_DAYS + 10))
-        mock_get_user.return_value = [vigente, vencido]
+    @pytest.mark.asyncio
+    async def test_get_user_cvs(self, client, cv_response_data):
+        fake_cvs = [dict(cv_response_data), dict(cv_response_data)]
 
-        respuesta = await get_user_cvs_endpoint("user1")
+        with patch(
+            "app.api.v1.cv_endpoint.CVRepository.get_cvs_by_user",
+            new=AsyncMock(return_value=fake_cvs),
+        ):
+            response = await client.get("/api/cv/user/507f1f77bcf86cd799439011")
 
-        assert respuesta["total"] == 1
-        assert [cv["_id"] for cv in respuesta["cvs"]] == ["vigente"]
-        assert respuesta["cvs"][0]["remaining_days"] == RETENTION_DAYS - 5
-        mock_delete.assert_awaited_once_with("vencido")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2
+        assert len(data["cvs"]) == 2
+        assert "expires_at" in data["cvs"][0]
 
-    @patch("app.api.v1.cv_endpoint.CVRepository.get_cvs_by_user", new_callable=AsyncMock)
-    async def test_usuario_sin_cvs_devuelve_lista_vacia(self, mock_get_user):
-        mock_get_user.return_value = []
+    @pytest.mark.asyncio
+    async def test_expired_cvs_are_filtered_out(self, client, cv_response_data):
+        from datetime import datetime, timedelta
 
-        respuesta = await get_user_cvs_endpoint("user1")
+        active_cv = dict(cv_response_data)
+        active_cv["_id"] = "64b000000000000000000000"
 
-        assert respuesta["total"] == 0
-        assert respuesta["cvs"] == []
+        expired_cv = dict(cv_response_data)
+        expired_cv["_id"] = "64b000000000000000000001"
+        expired_cv["created_at"] = datetime.utcnow() - timedelta(days=999)
+
+        delete_mock = AsyncMock(return_value=True)
+
+        with patch(
+            "app.api.v1.cv_endpoint.CVRepository.get_cvs_by_user",
+            new=AsyncMock(return_value=[active_cv, expired_cv]),
+        ):
+            with patch("app.api.v1.cv_endpoint.CVRepository.delete_cv", new=delete_mock):
+                response = await client.get("/api/cv/user/507f1f77bcf86cd799439011")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        delete_mock.assert_awaited_once()

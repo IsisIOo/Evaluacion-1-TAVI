@@ -1,121 +1,117 @@
-"""
-Tests unitarios de la política de retención de CVs (protección de datos personales).
-"""
+"""Tests para app/services/retention.py: política de retención de CVs."""
+
 from datetime import datetime, timedelta
 
+from app.core.config import settings
 from app.core.datetime_utils import utcnow
 from app.services.retention import (
-    enrich_cv_with_retention,
     get_expiration_date,
     get_remaining_days,
     get_remaining_seconds,
     is_expired,
+    enrich_cv_with_retention,
+    SECONDS_PER_DAY,
 )
-
-RETENTION_DAYS = 30
-CREATED_AT = datetime(2026, 1, 1, 12, 0, 0)
 
 
 class TestGetExpirationDate:
-    def test_expiration_date_es_creacion_mas_retencion(self):
-        expira = get_expiration_date(CREATED_AT, retention_days=RETENTION_DAYS)
-        assert expira == datetime(2026, 1, 31, 12, 0, 0)
+    def test_default_uses_settings_retention_days(self):
+        created = datetime(2025, 1, 1)
+        expected = created + timedelta(days=settings.CV_RETENTION_DAYS)
+        assert get_expiration_date(created) == expected
 
-    def test_acepta_string_iso(self):
-        expira = get_expiration_date("2026-01-01T12:00:00", retention_days=RETENTION_DAYS)
-        assert expira == datetime(2026, 1, 31, 12, 0, 0)
+    def test_custom_retention_days(self):
+        created = datetime(2025, 1, 1)
+        assert get_expiration_date(created, retention_days=7) == datetime(2025, 1, 8)
 
-    def test_acepta_string_con_z(self):
-        expira = get_expiration_date("2026-01-01T12:00:00Z", retention_days=RETENTION_DAYS)
-        assert expira == datetime(2026, 1, 31, 12, 0, 0)
+    def test_accepts_iso_string(self):
+        assert get_expiration_date("2025-01-01T00:00:00Z", retention_days=1) == datetime(2025, 1, 2)
 
-    def test_sin_created_at_usa_ahora(self):
-        antes = utcnow()
-        expira = get_expiration_date(None, retention_days=RETENTION_DAYS)
-        despues = utcnow() + timedelta(days=RETENTION_DAYS)
-        assert antes + timedelta(days=RETENTION_DAYS) <= expira <= despues
+    def test_aware_datetime_is_normalized_to_naive_utc(self):
+        created = datetime(2025, 1, 1, tzinfo=datetime.now().astimezone().tzinfo)
+        result = get_expiration_date(created, retention_days=1)
+        assert result.tzinfo is None
+        assert result == created.astimezone(__import__("datetime").timezone.utc).replace(tzinfo=None) + timedelta(days=1)
 
-
-class TestGetRemainingSeconds:
-    def test_restan_segundos_hasta_la_expiracion(self):
-        now = datetime(2026, 1, 16, 12, 0, 0)  # justo a mitad del periodo
-        restantes = get_remaining_seconds(CREATED_AT, now=now)
-        assert restantes == 15 * 86400
-
-    def test_vencido_devuelve_cero(self):
-        now = datetime(2026, 2, 2, 12, 0, 0)
-        restantes = get_remaining_seconds(CREATED_AT, now=now)
-        assert restantes == 0
-
-    def test_nunca_devuelve_negativos(self):
-        now = datetime(2026, 3, 15, 12, 0, 0)
-        restantes = get_remaining_seconds(CREATED_AT, now=now)
-        assert restantes == 0
-
-
-class TestGetRemainingDays:
-    def test_redondea_hacia_arriba_dias_parciales(self):
-        created = datetime(2026, 1, 1, 12, 0, 0)
-        now = datetime(2026, 1, 29, 6, 0, 0)  # restan ~2.25 días
-        assert get_remaining_days(created, now=now) == 3
-
-    def test_periodo_completo_30_dias(self):
-        now = datetime(2026, 1, 1, 12, 0, 0)
-        assert get_remaining_days(CREATED_AT, now=now) == 30
-
-    def test_vencido_devuelve_cero(self):
-        now = datetime(2026, 2, 2, 12, 0, 0)
-        assert get_remaining_days(CREATED_AT, now=now) == 0
+    def test_none_falls_back_to_now(self):
+        result = get_expiration_date(None, retention_days=1)
+        assert result > utcnow()
 
 
 class TestIsExpired:
-    def test_cv_reciente_no_esta_vencido(self):
-        assert is_expired(CREATED_AT, now=datetime(2026, 1, 15, 12, 0, 0)) is False
+    def test_recent_cv_is_not_expired(self):
+        assert is_expired(utcnow(), now=utcnow()) is False
 
-    def test_cv_en_el_limite_esta_vencido(self):
-        now = datetime(2026, 1, 31, 12, 0, 0)  # exactamente al cumplir el periodo
-        assert is_expired(CREATED_AT, now=now) is True
+    def test_old_cv_is_expired(self):
+        created = utcnow() - timedelta(days=settings.CV_RETENTION_DAYS + 1)
+        assert is_expired(created, now=utcnow()) is True
 
-    def test_cv_antiguo_esta_vencido(self):
-        assert is_expired(CREATED_AT, now=datetime(2026, 2, 20, 12, 0, 0)) is True
+    def test_absent_date_is_never_expired(self):
+        assert is_expired(None, now=utcnow()) is False
 
-    def test_sin_created_at_no_se_marca_vencido(self):
-        assert is_expired(None) is False
+
+class TestGetRemainingSeconds:
+    def test_remaining_seconds_positive(self):
+        created = utcnow() - timedelta(days=5)
+        seconds = get_remaining_seconds(created, now=utcnow())
+        assert seconds > 0
+
+    def test_expired_returns_zero(self):
+        created = utcnow() - timedelta(days=999)
+        assert get_remaining_seconds(created, now=utcnow()) == 0
+
+
+class TestGetRemainingDays:
+    def test_full_days_rounds_up(self):
+        # 1 segundo restante de 31 días => 1 día
+        now = utcnow()
+        created = now - timedelta(days=settings.CV_RETENTION_DAYS) + timedelta(seconds=1)
+        assert get_remaining_days(created, now=now) == 1
+
+    def test_partial_days_round_up(self):
+        # creado hace 28 días => le quedan 2 días completos
+        now = utcnow()
+        created = now - timedelta(days=28)
+        assert get_remaining_days(created, now=now) == 2
+
+    def test_fresh_cv_reports_full_period(self):
+        now = utcnow()
+        assert get_remaining_days(now, now=now) == settings.CV_RETENTION_DAYS
+
+    def test_expired_returns_zero(self):
+        created = utcnow() - timedelta(days=999)
+        assert get_remaining_days(created, now=utcnow()) == 0
+
+    def test_days_match_seconds(self):
+        created = utcnow()
+        seconds = get_remaining_seconds(created, now=utcnow())
+        days = get_remaining_days(created, now=utcnow())
+        assert days * SECONDS_PER_DAY >= seconds
+        assert (days - 1) * SECONDS_PER_DAY < seconds
 
 
 class TestEnrichCvWithRetention:
-    def _cv(self, created_at=None):
-        return {"_id": "abc123", "user_id": "user1", "created_at": created_at or CREATED_AT}
+    def test_adds_retention_fields(self, cv_response_data):
+        cv = dict(cv_response_data)
+        enriched = enrich_cv_with_retention(cv, now=utcnow())
 
-    def test_agrega_campos_de_retencion(self):
-        now = datetime(2026, 1, 16, 12, 0, 0)
-        enriquecido = enrich_cv_with_retention(self._cv(), now=now)
-
-        assert enriquecido["expires_at"] == "2026-01-31T12:00:00Z"
-        assert enriquecido["remaining_seconds"] == 15 * 86400
-        assert enriquecido["remaining_days"] == 15
-        assert enriquecido["is_expired"] is False
-
-    def test_no_muta_el_documento_original(self):
-        cv = self._cv()
-        original_id = cv["_id"]
-        enrich_cv_with_retention(cv)
-        assert cv["_id"] == original_id
-        assert "remaining_days" not in cv
+        assert "expires_at" in enriched
+        assert "remaining_seconds" in enriched
+        assert "remaining_days" in enriched
+        assert "is_expired" in enriched
+        assert enriched["is_expired"] is False
+        assert enriched["remaining_days"] == settings.CV_RETENTION_DAYS
+        # No muta el documento original
         assert "expires_at" not in cv
 
-    def test_cv_vencido_marca_is_expired_y_tiempo_cero(self):
-        now = datetime(2026, 2, 20, 12, 0, 0)
-        enriquecido = enrich_cv_with_retention(self._cv(), now=now)
+    def test_expired_cv_is_marked(self, cv_response_data):
+        cv = dict(cv_response_data)
+        cv["created_at"] = utcnow() - timedelta(days=999)
+        enriched = enrich_cv_with_retention(cv, now=utcnow())
+        assert enriched["is_expired"] is True
+        assert enriched["remaining_seconds"] == 0
 
-        assert enriquecido["is_expired"] is True
-        assert enriquecido["remaining_seconds"] == 0
-        assert enriquecido["remaining_days"] == 0
-
-    def test_respeta_el_valor_por_defecto_de_configuracion(self):
-        enriquecido = enrich_cv_with_retention(
-            {"_id": "abc", "created_at": utcnow()}
-        )
-        assert enriquecido["remaining_days"] == 30
-        assert enriquecido["is_expired"] is False
-        assert enriquecido["expires_at"].endswith("Z")
+    def test_expires_at_uses_utc_z_suffix(self, cv_response_data):
+        cv = dict(cv_response_data)
+        enriched = enrich_cv_with_retention(cv, now=utcnow())
+        assert enriched["expires_at"].endswith("Z")

@@ -253,3 +253,16 @@ Errores y logs quedan guardados en cronjob_log.log
 - [ ] Agregar opción de descargar CV como PDF
 - [ ] Agregar historial de CVs generados
 - [ ] Validación más robusta del formulario
+
+## Correr Test unitarios
+Dentro de la carpeta de frontend ejecutar:
+
+```bash
+npm run test
+```
+Dentro de la carpeta de backend con el venv activo ejecutar:
+
+```bash
+python -m pytest
+```
+Puede que sea necesario descargar pytest

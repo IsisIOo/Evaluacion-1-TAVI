@@ -21,7 +21,7 @@ class QuotaExceededError(Exception):
     pass
 
 def _is_quota_error(error: str) -> bool:
-    keywords = ["quota", "resource exhausted", "rate limit", "429", "too many requests",
+    keywords = ["quota", "resource exhausted", "resource has been exhausted", "rate limit", "429", "too many requests",
                 "insufficient tokens", "daily limit", "monthly limit"]
     return any(kw in error.lower() for kw in keywords)
 

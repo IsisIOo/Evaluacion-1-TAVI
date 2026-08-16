@@ -936,4 +936,6 @@ export default {
     },
   },
 };
+
+export { validateRut, formatRut, formatPhone, monthLabel, ciudadesCl, paises };
 </script>
