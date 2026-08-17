@@ -12,3 +12,5 @@ sentence-transformers
 streamlit
 huggingface-hub
 python-dotenv
+ragas
+langchain-groq
