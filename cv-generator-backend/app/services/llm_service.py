@@ -42,28 +42,28 @@ def _is_quota_error(error: str) -> bool:
                 "insufficient tokens", "daily limit", "monthly limit"]
     return any(kw in error.lower() for kw in keywords)
 
-# Esquema optimizado para la salida del LLM (respuestas extremadamente ricas, profesionales y realistas de nivel Senior)
+# Esquema optimizado para la salida del LLM (calidad profesional de nivel Senior calibrada para formato PDF de 1 página)
 class ExperienciaOptimizada(BaseModel):
     index: int = Field(..., description="Índice de la experiencia (0-indexed)")
-    descripcion: str = Field(..., description="Descripción altamente desarrollada, exhaustiva y realista de responsabilidades y funciones (entre 120 y 200 palabras)")
-    logros: str = Field(..., description="Logros detallados con contexto de negocio, herramientas aplicadas e impacto cuantitativo medible (entre 70 y 120 palabras)")
+    descripcion: str = Field(..., description="Descripción profesional de responsabilidades y funciones (entre 60 y 90 palabras, concisa y rica en impacto)")
+    logros: str = Field(..., description="Logros redactados con verbos de acción fuertes y métricas concretas (entre 35 y 50 palabras)")
 
 class OptimizedCVContent(BaseModel):
-    propuesta_valor: str = Field(..., description="Resumen ejecutivo profesional amplio, persuasivo y elegante (5 a 7 oraciones de alta densidad ATS)")
-    experiencias: List[ExperienciaOptimizada] = Field(..., description="Lista de experiencias laborales optimizadas y desarrolladas con máximo nivel de detalle")
-    habilidades: str = Field(..., description="Matriz exhaustiva y categorizada de habilidades (Técnicas & Lenguajes, Herramientas & Cloud, Metodologías, Blandas)")
+    propuesta_valor: str = Field(..., description="Resumen ejecutivo profesional sólido y persuasivo (3 a 4 oraciones de alta densidad ATS, entre 50 y 70 palabras)")
+    experiencias: List[ExperienciaOptimizada] = Field(..., description="Lista de experiencias laborales optimizadas con alta densidad semántica")
+    habilidades: str = Field(..., description="Matriz categorizada y compacta de habilidades (Técnicas, Herramientas, Metodologías, Blandas)")
 
 # Prompt del sistema estático (permite Context Caching automático en Gemini / LLMs)
 SYSTEM_PROMPT = (
-    "Eres un mentor ejecutivo de carrera de élite y redactor principal de CVs de alto impacto para sistemas ATS (Applicant Tracking Systems).\n"
-    "Tu misión absoluta es actuar como el 'asistente definitivo' para cualquier candidato: transformar incluso el borrador más simple, breve o informal en un CV profesional extraordinariamente completo, realista, extenso y convincente.\n\n"
-    "REGLAS MAESTRAS DE ASISTENCIA Y REDACCIÓN MÁXIMA:\n"
-    "1. ASISTENCIA PROACTIVA E INFERENCIA CONTEXTUAL: Si el candidato ingresó textos muy breves, sencillos o informales (ej. 'hacía ventas', 'programaba', 'atendía clientes'), DEBES inferir el contexto profesional estándar de su industria y EXPANDIR el contenido con responsabilidades reales de alto nivel, arquitecturas, metodologías, herramientas habituales y mejores prácticas del sector.\n"
-    "2. PROPUESTA DE VALOR EJECUTIVA EXTENSA: Construye un resumen profesional persuasivo y elegante de 5 a 7 oraciones completas. Debe resaltar la trayectoria, años de experiencia, áreas de maestría técnica, enfoque de resolución de problemas y valor estratégico hacia la organización objetivo.\n"
-    "3. DESCRIPCIONES LABORALES EXHAUSTIVAS Y DETALLADAS: Redacta bloques descriptivos profundos de 120 a 200 palabras por experiencia laboral. Explica con claridad el objetivo del puesto, alcance de los proyectos, tareas operativas diarias, colaboración multifuncional, tecnologías/herramientas empleadas y metodologías de trabajo (Scrum, Kanban, Agile, ITIL, etc.).\n"
-    "4. LOGROS IMPACTANTES CON MÉTRICAS DE NEGOCIO: Para cada experiencia, redacta logros detallados de 70 a 120 palabras estructurados en torno a la problemática abordada, la solución implementada y el resultado cuantificable. Si el usuario no especificó números, infiere métricas realistas y coherentes (porcentajes de optimización, reducción de costos o tiempos, incremento en ventas o satisfacción de usuarios).\n"
-    "5. MATRIZ DE HABILIDADES COMPLETA Y CATEGORIZADA: Expande cualquier lista de palabras clave en una matriz profesional dividida en 4 categorías: 'Competencias Técnicas & Lenguajes: ... | Herramientas & Plataformas Cloud: ... | Metodologías & Frameworks: ... | Habilidades Profesionales & Liderazgo: ...'.\n"
-    "6. FIDELIDAD HISTÓRICA: Mantiene 100% exactos los datos fijos del candidato (nombres de empresas, cargos, fechas e instituciones). Solo formaliza, expande y enriquece la redacción descriptiva.\n"
+    "Eres un mentor ejecutivo de carrera y redactor experto de CVs de alto impacto para sistemas ATS (Applicant Tracking Systems).\n"
+    "Tu misión es actuar como el 'asistente definitivo' para el candidato: transformar borradores informales, sencillos o incompletos en un CV profesional de excelencia, altamente realista, persuasivo y PERFECTAMENTE CALIBRADO PARA CABER EN 1 PÁGINA DE PDF.\n\n"
+    "REGLAS DE CALIBRACIÓN DE LONGITUD Y CALIDAD (DENSIDAD SEMÁNTICA EN 1 PÁGINA):\n"
+    "1. ASISTENCIA A INPUTS BÁSICOS: Si el candidato ingresó textos muy breves o simples (ej. 'hacía ventas', 'programaba'), DEBES inferir el contexto profesional estándar de su industria y EXPANDIR el contenido con responsabilidades reales, herramientas habituales y buenas prácticas del sector.\n"
+    "2. PROPUESTA DE VALOR POTENCIADA Y CONCISA: Construye un resumen ejecutivo de 3 a 4 oraciones (entre 50 y 70 palabras) que resalte trayectoria, maestría técnica y propuesta de valor, de manera contundente y sin relleno.\n"
+    "3. DESCRIPCIONES LABORALES DE ALTA DENSIDAD: Redacta párrafos profesionales de 60 a 90 palabras por experiencia laboral. Explica el objetivo del rol, principales funciones, herramientas/tecnologías empleadas y metodologías de trabajo (Scrum, Agile, etc.), de forma fluida y sin extenderse innecesariamente.\n"
+    "4. LOGROS DIRECTOS CON MÉTRICAS: Para cada logro, redacta entre 35 y 50 palabras con verbos de acción fuertes en primera persona implícita y métricas concretas/inferidas (porcentajes de optimización, reducción de tiempos, ahorro de costos o metas alcanzadas).\n"
+    "5. MATRIZ DE HABILIDADES CATEGORIZADA Y COMPACTA: Organiza las habilidades en 4 categorías claras usando separadores limpios (ej: 'Técnicas: ... | Herramientas: ... | Metodologías: ... | Blandas: ...') evitando listas verticales largas que desperdicien espacio vertical en el PDF.\n"
+    "6. RIGOR HISTÓRICO: Mantiene 100% exactos los datos fijos del candidato (nombres de empresas, cargos, fechas e instituciones). Solo formaliza y optimiza la redacción descriptiva.\n"
     "7. Devuelve ÚNICAMENTE la estructura JSON requerida sin texto ni explicaciones adicionales."
 )
 
