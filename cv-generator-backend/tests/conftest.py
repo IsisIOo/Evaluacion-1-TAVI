@@ -8,11 +8,20 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
 import pytest
+import pytest_asyncio
 from datetime import datetime
 
 from app.schemas.cv_request import CVRequest
 from app.schemas.cv_response import CVResponse
 from app.db.models import UserDocument
+from app.db.session import connect_to_mongo, close_mongo_connection
+
+
+@pytest_asyncio.fixture
+async def mongo_connection():
+    await connect_to_mongo()
+    yield
+    await close_mongo_connection()
 
 
 @pytest.fixture

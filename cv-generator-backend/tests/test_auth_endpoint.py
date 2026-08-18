@@ -1,6 +1,7 @@
 """Tests para app/api/v1/auth_endpoint.py: registro y login."""
 
 import pytest
+import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 
@@ -8,10 +9,11 @@ from app.main import app
 from app.db.session import get_db
 
 
-@pytest.fixture
-def client():
+@pytest_asyncio.fixture
+async def client(mongo_connection):
     transport = ASGITransport(app=app)
-    return AsyncClient(transport=transport, base_url="http://test")
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
 
 
 @pytest.fixture
