@@ -46,7 +46,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(g
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Correo o contraseña incorrectos",
-            headers={"WWw-Authenticate": "Bearer"},
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
     # Generar Token
@@ -55,12 +55,3 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(g
         "access_token": access_token,
         "token_type": "bearer"
     }
-
-@router.get("/users", response_model=list[UserResponse])
-async def get_users(db = Depends(get_db)):
-    """
-    Endpoint para obtener el listado de todos los usuarios registrados
-    """
-    user_repo = UserRepository(db)
-    users = await user_repo.get_all_users()
-    return users

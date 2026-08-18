@@ -1,18 +1,36 @@
 """Fixtures compartidos para los tests del backend."""
-
-import sys
 import os
+import sys
 from pathlib import Path
+
+# Fijar variables de entorno ANTES de importar app
+os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production")
+os.environ.setdefault("MONGO_URI", "mongodb://localhost:27017/test_cv_db")
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
 import pytest
-from datetime import datetime
-
+from app.core.security import create_access_token
+from app.db.models import UserDocument
 from app.schemas.cv_request import CVRequest
 from app.schemas.cv_response import CVResponse
-from app.db.models import UserDocument
+
+
+@pytest.fixture
+def fake_user():
+    return UserDocument(
+        _id="user1",
+        email="test@example.com",
+        password_hash="$2b$12$fakehash",
+        nombre="Test User",
+    )
+
+
+@pytest.fixture
+def auth_headers(fake_user):
+    token = create_access_token(fake_user.id)
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture

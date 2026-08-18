@@ -15,16 +15,16 @@ class TestCalculateCost:
         assert cost == 0.0
 
     def test_zero_cost_for_zero_tokens(self):
-        cost = self.callback._calculate_cost("gemini-1.5-pro", 0, 0)
+        cost = self.callback._calculate_cost("gemini-3.5-flash", 0, 0)
         assert cost == 0.0
 
     def test_cost_for_known_model(self):
-        # gemini-1.5-pro: input 0.0004/1M, output 0.0008/1M
-        cost = self.callback._calculate_cost("gemini-1.5-pro", 1_000_000, 500_000)
-        assert cost == pytest.approx(0.0004 + 0.0004)
+        # gemini-3.5-flash: input 1.50/1M, output 9.00/1M
+        cost = self.callback._calculate_cost("gemini-3.5-flash", 1_000_000, 500_000)
+        assert cost == pytest.approx(1.50 + 4.50)
 
     def test_cost_is_float(self):
-        cost = self.callback._calculate_cost("gemini-1.5-pro", 655, 984)
+        cost = self.callback._calculate_cost("gemini-3.5-flash", 655, 984)
         assert isinstance(cost, float)
 
 

@@ -12,6 +12,7 @@ from app.services.llm_service import (
     _build_cv_prompt,
     _get_matching_job_offers,
     QuotaExceededError,
+    OptimizedCVContent,
     generate_cv,
 )
 
@@ -114,10 +115,11 @@ class TestGetMatchingJobOffers:
 
         with patch("app.services.llm_service.POINTER_PATH", str(pointer)):
             with patch("app.services.llm_service.DATA_DIR", str(tmp_path)):
-                with patch("app.services.llm_service.HuggingFaceEmbeddings") as mock_emb:
-                    with patch("app.services.llm_service.Chroma") as mock_chroma:
-                        mock_chroma.return_value = fake_db
-                        result = _get_matching_job_offers("programador python", k=1)
+                with patch("app.services.llm_service.RAG_AVAILABLE", True):
+                    with patch("app.services.llm_service.HuggingFaceEmbeddings") as mock_emb:
+                        with patch("app.services.llm_service.Chroma") as mock_chroma:
+                            mock_chroma.return_value = fake_db
+                            result = _get_matching_job_offers("programador python", k=1)
 
         assert "Oferta #1" in result
         assert "Tecnología" in result
@@ -131,30 +133,42 @@ class TestGetMatchingJobOffers:
 
 class TestGenerateCv:
     @pytest.mark.asyncio
-    async def test_returns_cv_response_directly(self, cv_request, cv_response):
+    async def test_returns_cv_response_directly(self, cv_request):
+        optimized = OptimizedCVContent(
+            propuesta_valor="Resumen profesional de prueba",
+            experiencias=[],
+            habilidades="Python, FastAPI",
+        )
         fake_llm = MagicMock()
         fake_structured = AsyncMock()
-        fake_structured.ainvoke.return_value = cv_response
+        fake_structured.ainvoke.return_value = optimized
         fake_llm.with_structured_output.return_value = fake_structured
 
         with patch("app.services.llm_service.get_deterministic_llm", return_value=fake_llm):
             with patch("app.services.llm_service._get_matching_job_offers", return_value=""):
-                result = await generate_cv(cv_request)
+                with patch("app.services.llm_service.get_cached_cv_response", return_value=None):
+                    result = await generate_cv(cv_request)
 
-        assert result == cv_response
+        assert isinstance(result, CVResponse)
         fake_llm.with_structured_output.assert_called_once()
         fake_structured.ainvoke.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_validates_dict_response(self, cv_request, cv_response_data):
+    async def test_validates_dict_response(self, cv_request):
+        optimized_dict = {
+            "propuesta_valor": "Resumen profesional de prueba",
+            "experiencias": [],
+            "habilidades": "Python, FastAPI",
+        }
         fake_llm = MagicMock()
         fake_structured = AsyncMock()
-        fake_structured.ainvoke.return_value = dict(cv_response_data)
+        fake_structured.ainvoke.return_value = optimized_dict
         fake_llm.with_structured_output.return_value = fake_structured
 
         with patch("app.services.llm_service.get_deterministic_llm", return_value=fake_llm):
             with patch("app.services.llm_service._get_matching_job_offers", return_value=""):
-                result = await generate_cv(cv_request)
+                with patch("app.services.llm_service.get_cached_cv_response", return_value=None):
+                    result = await generate_cv(cv_request)
 
         assert isinstance(result, CVResponse)
         assert result.personal.nombre_completo == "Jaime Gustamante"

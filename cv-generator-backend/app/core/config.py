@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     # Política de retención de datos personales
     CV_RETENTION_DAYS: int = Field(default=30, description="Días que un CV permanece almacenado antes de eliminarse automáticamente (protección de datos personales)")
 
+    # Seguridad
+    JWT_SECRET: str = Field(..., description="Secreto para firmar tokens JWT. Debe ir en .env y generarse de forma segura")
+    JWT_ALGORITHM: str = Field(default="HS256", description="Algoritmo de firma de los tokens JWT")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, description="Minutos de validez del token de acceso")
+
     # Configuración LLM
     # OPENAI_API_KEY: str | None = Field(None, description="API key para OpenAI")
     GEMINI_API_KEY: str | None = Field(None, description="API key para acceder a modelo Gemini")
