@@ -77,10 +77,12 @@ jobs:
           # Inyectamos variables de entorno que tu backend y pruebas puedan requerir
           MONGO_URI: mongodb://localhost:27017/test_cv_database
           JWT_SECRET: supersecret_test_key
+          GOOGLE_API_KEY: "mock_key_for_unit_tests"
+          GEMINI_API_KEY: "mock_key_for_unit_tests"
           PYTHONPATH: .
         run: |
           pytest tests/ -v
-
+          
   # -------------------------------------------------------------------------
   # 3. EVALUACIÓN DE RAGAS (IA)
   # -------------------------------------------------------------------------
@@ -117,4 +119,4 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: .
         run: |
-          python test_scripts/run_ragas_evaluation.py
+          python test_scripts/run_ragas_real_evaluation.py

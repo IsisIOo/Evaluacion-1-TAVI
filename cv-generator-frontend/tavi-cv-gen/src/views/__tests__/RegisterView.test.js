@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { shallowMount } from "@vue/test-utils";
 import RegisterView from "@/views/RegisterView.vue";
 
