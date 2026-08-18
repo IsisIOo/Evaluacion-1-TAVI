@@ -1,39 +1,37 @@
 import json
 import os
 import warnings
-from datasets import Dataset
 from dotenv import load_dotenv
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_groq import ChatGroq
-from ragas import evaluate
-from ragas.metrics import AnswerRelevancy, Faithfulness
 
-# Cargar variables de entorno desde el archivo .env
-load_dotenv()
+# Sube DOS niveles para encontrar el .env
+ruta_env = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+load_dotenv(ruta_env)
 
+# 1. CAMBIO CLAVE: Importamos AsyncOpenAI en lugar de OpenAI
+from openai import AsyncOpenAI
+from ragas.llms import llm_factory
+from ragas.metrics.collections import Faithfulness
 
-def run_evaluation():
-    groq_api_key = os.getenv("GROQ_API_KEY")
+groq_api_key = os.getenv("GROQ_API_KEY")
 
+async def run_evaluation():
     if not groq_api_key:
-        warnings.warn(
-            "GROQ_API_KEY no encontrada en el .env. Asegúrate de definirla."
-        )
+        warnings.warn("GROQ_API_KEY no encontrada en el .env. Asegúrate de definirla.")
         return
 
-    # 1. Inicializar el Juez LLM y Embeddings para Ragas
-    juez_llm = ChatGroq(
-        model_name="llama-3.3-70b-versatile",
+    # 2. CAMBIO CLAVE: Inicializamos el cliente asíncrono
+    groq_client = AsyncOpenAI(
         api_key=groq_api_key,
-        temperature=0.0,
+        base_url="https://api.groq.com/openai/v1"
     )
 
-    # Embeddings locales para calcular la métrica AnswerRelevancy
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    # Inicializar el juez y pasarlo a la métrica directamente
+    ragas_juez = llm_factory("openai/gpt-oss-20b", client=groq_client)
+    evaluador_fidelidad = Faithfulness(llm=ragas_juez)
 
-    print("Juez y modelo de embeddings inicializados...")
+    print("Juez y métrica inicializados...")
 
-    # 2. Leer oferta de trabajo del JSONL
+    # Leer oferta de trabajo del JSONL
     ruta_archivo = os.path.join(
         os.path.dirname(__file__), "..", "data", "datos_ofertas.jsonl"
     )
@@ -46,38 +44,56 @@ def run_evaluation():
         print(f"Error leyendo el JSONL ({e}). Usando oferta por defecto.")
         oferta_texto = "Oferta genérica de Desarrollador Backend"
 
-    print("Preparando dataset de Ragas...")
+    print("Iniciando evaluación...")
 
-    # 3. Preparar los datos de prueba
-    data_samples = {
-        "question": [
-            f"Optimiza este perfil para la siguiente oferta laboral en Chile: {oferta_texto}"
-        ],
-        "contexts": [[
-            "Profesional del área TI con 3 años de experiencia en desarrollo de software.",
-            "Conocimientos intermedios en lenguajes orientados a objetos y bases de datos relacionales.",
-            "Experiencia trabajando en equipos bajo metodologías ágiles (Scrum).",
-        ]],
-        "answer": [
-            "Desarrollador de software con más de 3 años de trayectoria creando soluciones tecnológicas. "
-            "Poseo un sólido manejo de bases de datos relacionales y programación orientada a objetos. "
-            "Destaco por mi capacidad para integrarme rápidamente a equipos multidisciplinarios utilizando metodologías ágiles como Scrum, asegurando la entrega continua de valor."
-        ],
+    # Datos directos
+    pregunta = f"Optimiza este perfil para la siguiente oferta laboral en Chile: {oferta_texto}"
+    
+    contextos = [
+        "Profesional del área TI con 3 años de experiencia en desarrollo de software.",
+        "Conocimientos intermedios en lenguajes orientados a objetos y bases de datos relacionales.",
+        "Experiencia trabajando en equipos bajo metodologías ágiles (Scrum)."
+    ]
+    
+    respuestas = {
+        "Respuesta 1 - fiel": (
+            "Profesional del área TI con 3 años de experiencia en desarrollo de software. "
+            "Cuenta con conocimientos intermedios en lenguajes orientados a objetos y bases de datos relacionales. "
+            "Además, posee experiencia trabajando en equipos bajo metodologías ágiles como Scrum."
+        ),
+
+        "Respuesta 2 - agrega información": (
+            "Desarrollador de software con más de 5 años de experiencia creando aplicaciones web. "
+            "Poseo un dominio avanzado de Python, Java y PostgreSQL, además de experiencia trabajando "
+            "con equipos multidisciplinarios mediante Scrum."
+        ),
+
+        "Respuesta 3 - mezcla información": (
+            "Profesional TI con 3 años de experiencia en desarrollo de software y conocimientos "
+            "intermedios en programación orientada a objetos y bases de datos relacionales. "
+            "También tengo experiencia liderando equipos de desarrollo y trabajando con Docker."
+        )
     }
 
-    dataset = Dataset.from_dict(data_samples)
+    print("\nRESULTADOS DE LA EVALUACIÓN")
 
-    print("Iniciando evaluación...")
-    resultado = evaluate(
-        dataset=dataset,
-        metrics=[Faithfulness(), AnswerRelevancy()],
-        llm=juez_llm,
-        embeddings=embeddings,
-    )
+    for nombre, respuesta in respuestas.items():
 
-    print("\nRESULTADOS DE LA EVALUACIÓN:")
-    print(resultado)
+        resultado = await evaluador_fidelidad.ascore(
+            user_input=pregunta,
+            retrieved_contexts=contextos,
+            response=respuesta
+        )
 
+        print(f"\n--- {nombre} ---")
+        print(f"Faithfulness Score: {resultado.value}")
+        print(f"Razón: {resultado.reason}")
 
 if __name__ == "__main__":
-    run_evaluation()
+    import asyncio
+    asyncio.run(run_evaluation())
+
+
+#Respuesta 1 = 1.0: toda la información está respaldada por los contextos.
+#Respuesta 2 = 0.0: introduce información que no aparece en los contextos.
+#Respuesta 3 = 0.6: mezcla información respaldada con información inventada/no recuperada.
