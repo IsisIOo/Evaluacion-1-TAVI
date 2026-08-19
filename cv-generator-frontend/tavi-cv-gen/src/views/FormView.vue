@@ -512,16 +512,33 @@
                   class="mb-4"
                   border="left"
                 >
-                  Debes confirmar que la información es correcta antes de generar tu CV.
+                  Debes confirmar que la información es correcta y aceptar los términos de privacidad para generar tu CV.
                 </v-alert>
 
                 <p class="mb-4">Revisa tus datos antes de enviar a la IA.</p>
+                
                 <v-checkbox
                   v-model="valid"
                   :rules="[(v) => !!v || 'Debes confirmar para continuar']"
                   color="primary"
-                  label="Confirmo que la información es correcta"
+                  label="Confirmo que la información ingresada es correcta"
+                  hide-details="auto"
+                  class="mb-2"
                 />
+
+                <!-- NUEVO DISCLAIMER DE PRIVACIDAD -->
+                <v-checkbox
+                  v-model="acceptTerms"
+                  :rules="[(v) => !!v || 'Debes aceptar la política de datos para continuar']"
+                  color="primary"
+                  hide-details="auto"
+                >
+                  <template v-slot:label>
+                    <div class="text-caption">
+                      Acepto el procesamiento de mis datos personales para la generación del currículum mediante Inteligencia Artificial. Comprendo que esta información será procesada de forma segura y eliminada automáticamente de los servidores tras su periodo de retención, conforme a la normativa vigente.
+                    </div>
+                  </template>
+                </v-checkbox>
               </v-card>
             </v-stepper-window-item>
           </v-stepper-window>
@@ -656,6 +673,7 @@ export default {
     step: 1,
     loading: false,
     valid: false,
+    acceptTerms: false,
     showValidationError: false,
     showApiError: false,
     apiError: '',
@@ -812,7 +830,21 @@ export default {
         const inputData = JSON.parse(this.debugJson);
         
         // Llenamos el formulario
-        if (inputData.personal) this.form.personal = { ...this.form.personal, ...inputData.personal };
+        if (inputData.personal) {
+          
+          if (inputData.personal.rut) {
+            if (!validateRut(inputData.personal.rut)) {
+              console.warn("ZONA DEBUG: El RUT del JSON falló la matemática (Módulo 11). Usando un RUT válido de prueba para no bloquear el test.");
+              inputData.personal.rut = "20.886.527-7"; // RUT matemáticamente válido
+            } else {
+              // Si sí es válido, nos aseguramos de que entre ya con el formato visual bonito
+              inputData.personal.rut = formatRut(inputData.personal.rut);
+            }
+          }
+
+          this.form.personal = { ...this.form.personal, ...inputData.personal };
+        }
+
         if (inputData.perfil) this.form.perfil = { ...this.form.perfil, ...inputData.perfil };
         
         // Aseguramos que los arreglos se copien correctamente para evitar errores en Vue
@@ -827,6 +859,7 @@ export default {
         // Saltamos visualmente al paso 5 y marcamos el checkbox de confirmación
         this.step = 5;
         this.valid = true;
+        this.acceptTerms = true;
 
         await this.$nextTick(); 
         await new Promise(resolve => setTimeout(resolve, 150));
@@ -975,7 +1008,7 @@ export default {
     },
     async submitForm() {
       const allValid = await this.validateAllSteps();
-      if (!allValid || !this.valid) {
+      if (!allValid || !this.valid || !this.acceptTerms) { 
         this.showValidationError = true;
         return;
       }
