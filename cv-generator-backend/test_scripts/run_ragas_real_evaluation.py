@@ -4,6 +4,19 @@ import json
 import os
 import statistics
 import sys
+import types
+
+
+try:
+    from langchain_community.chat_models.vertexai import ChatVertexAI
+except ModuleNotFoundError:
+    from langchain_google_vertexai import ChatVertexAI
+
+    vertexai_module = types.ModuleType(
+        "langchain_community.chat_models.vertexai"
+    )
+    vertexai_module.ChatVertexAI = ChatVertexAI
+    sys.modules[vertexai_module.__name__] = vertexai_module
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI

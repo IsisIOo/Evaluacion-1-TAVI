@@ -17,6 +17,7 @@ bcrypt==5.0.0
 langchain-core==1.5.1
 langchain-community==0.4.2
 langchain-google-genai==4.3.1
+langchain-google-vertexai
 langchain-huggingface==1.2.2
 langchain-chroma==1.1.0
 sentence-transformers==5.6.1
