@@ -56,8 +56,11 @@ MONGO_DB_NAME=cv_db
 
 # Backend - Google Gemini AI
 GEMINI_API_KEY=tu_clave_api_de_gemini_aqui
-MODEL_NAME=gemini-2.5-flash
+MODEL_NAME=gemini-3.5-flash
 MAX_TOKENS=1000
+
+# Backend - Seguridad (requerido, la app no arranca sin esto)
+JWT_SECRET=genera_un_secreto_seguro_aqui
 
 # Frontend
 VITE_API_URL=http://localhost:8000/api/v1
@@ -209,6 +212,10 @@ Durante el setup, se crearon/modificaron estos archivos:
 - Verifica que `.env` existe en `/cv-generator-backend/.env`
 - Asegúrate que MongoDB está corriendo (`mongod --dbpath ~/mongodb_data`)
 
+### Error: `JWT_SECRET field required`
+- Agrega `JWT_SECRET=tu_secreto_aqui` en tu `.env`
+- Genera un secreto seguro: `python3 -c "import secrets; print(secrets.token_hex(32))"`
+
 ### Error: `Module not found: pdfmake`
 - Ejecuta: `npm install pdfmake`
 
@@ -253,3 +260,7 @@ Errores y logs quedan guardados en cronjob_log.log
 - [ ] Agregar opción de descargar CV como PDF
 - [ ] Agregar historial de CVs generados
 - [ ] Validación más robusta del formulario
+
+
+# ENTREGA 3
+Para usar RAGAS, crear api key de roq (https://console.groq.com) esquina superior derecha -> api key -> crear api key

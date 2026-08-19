@@ -1,0 +1,19 @@
+FROM node:20-slim
+
+# Permite logs inmediatos y evita prompts interactivos durante npm install.
+ENV NODE_ENV=development \
+    CI=true
+
+WORKDIR /app
+
+# Copiamos primero package files para aprovechar cache de dependencias.
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+EXPOSE 3000
+
+# --host 0.0.0.0 permite acceder al dev server desde fuera del contenedor.
+CMD ["npm", "run", "serve", "--", "--host", "0.0.0.0", "--port", "3000"]

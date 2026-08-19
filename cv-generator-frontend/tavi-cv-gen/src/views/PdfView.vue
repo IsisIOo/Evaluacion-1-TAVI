@@ -79,15 +79,75 @@
                 </v-expansion-panel-text>
               </v-expansion-panel>
 
-              <v-expansion-panel title="Habilidades (Formato RAG)">
-                <v-expansion-panel-text class="pt-2">
-                  <p class="text-caption text-grey mb-2">Nota: Modifica o añade categorías separándolas con una barra vertical "|".</p>
-                  <v-textarea v-model="cvDat.habilidades" label="Habilidades" variant="outlined" auto-grow rows="4"></v-textarea>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
+        <v-btn
+            v-if = "cvDat"
+            color = "success"
+            @click = "generatePDF"
+            class="mr-2"
+        >
+        Abrir PDF en nueva pestaña
+        </v-btn>
 
-            </v-expansion-panels>
-          </v-card-text>
+        <v-btn
+            v-if = "cvDat"
+            color = "success"
+            @click = "downloadPDF"
+            class="mr-2"
+        >
+            Descargar CV PDF
+        </v-btn>
+
+        <v-alert
+            v-if="cvDat && cvDat.remaining_days !== undefined"
+            type="info"
+            variant="tonal"
+            class="mt-4"
+            prepend-icon="mdi-shield-lock-outline"
+        >
+            Este CV se eliminará automáticamente por protección de datos
+            el {{ formatExpiration(cvDat.expires_at) }}
+            (quedan {{ cvDat.remaining_days }} día{{ cvDat.remaining_days === 1 ? '' : 's' }}).
+        </v-alert>
+
+        <v-card v-if="cvDat && !loading" class="mt-4">
+            <v-card-title>Vista Previa del CV</v-card-title>
+            <v-card-text>
+                <div class="cv-preview pa-6">
+                    <div class="text-center mb-4">
+                        <h1 class="text-h4 font-weight-bold">{{ cvDat.personal.nombre_completo }}</h1>
+                        <h2 class="text-h6 text-medium-emphasis">{{ cvDat.personal.profesion }}</h2>
+                        <p class="text-caption text-grey">
+                            {{ cvDat.personal.email }} | {{ cvDat.personal.telefono }} | {{ cvDat.personal.ciudad }}
+                        </p>
+                        <p class="text-caption text-grey">
+                            Rut: {{ cvDat.personal.rut }}{{ cvDat.personal.linkedin ? ' | LinkedIn: ' + cvDat.personal.linkedin : '' }}
+                        </p>
+                    </div>
+
+                    <v-divider class="mb-4" />
+
+                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2">Perfil Profesional</h3>
+                    <p class="text-body-2 mb-1">{{ cvDat.perfil.propuesta_valor }}</p>
+                    <p class="text-body-2 mb-1">Años de experiencia: {{ cvDat.perfil.anios_experiencia }}</p>
+                    <p class="text-body-2 mb-4">Experticia: {{ cvDat.perfil.experticia }}</p>
+
+                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2">Experiencia Laboral</h3>
+                    <div v-for="(exp, i) in cvDat.experiencias" :key="i" class="mb-3">
+                        <p class="text-body-2 font-weight-bold mb-0">{{ exp.cargo }} - {{ exp.empresa }}</p>
+                        <p class="text-caption font-italic mb-0">{{ exp.periodo }} | {{ exp.pais }}</p>
+                        <p class="text-body-2 mb-0">Funciones: {{ exp.descripcion }}</p>
+                        <p v-if="exp.logros" class="text-body-2 mb-0">Logros: {{ exp.logros }}</p>
+                    </div>
+
+                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2">Formación Académica</h3>
+                    <p v-for="(form, i) in cvDat.formacion" :key="i" class="text-body-2 mb-1">
+                        {{ form.titulo }} en {{ form.institucion }} ({{ form.periodo }})
+                    </p>
+
+                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2 mt-4">Habilidades</h3>
+                    <p class="text-body-2">{{ cvDat.habilidades }}</p>
+                </div>
+            </v-card-text>
         </v-card>
       </v-col>
 
@@ -174,7 +234,17 @@
                     } else {
                         const dLLM = window.history.state;
                         if(dLLM && dLLM.dataLlm){
-                            this.cvDat = dLLM.dataLlm.cv_data;
+                            const data = dLLM.dataLlm;
+                            this.cvDat = data.cv_data;
+                            // la respuesta de /generate trae la retención a nivel raíz
+                            if (data.remaining_days !== undefined) {
+                                this.cvDat = {
+                                    ...this.cvDat,
+                                    expires_at: data.expires_at,
+                                    remaining_seconds: data.remaining_seconds,
+                                    remaining_days: data.remaining_days,
+                                };
+                            }
                         }
                     }
 
@@ -186,6 +256,11 @@
                 finally{
                     this.loading = false;
                 }
+            },
+
+            formatExpiration(iso){
+                if (!iso) return '';
+                return new Date(iso).toLocaleDateString('es-CL');
             },
 
             getFormat(){
