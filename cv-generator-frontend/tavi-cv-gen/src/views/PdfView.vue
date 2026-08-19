@@ -4,8 +4,11 @@
 
     <v-row v-if="cvDat && !loading">
       
+      <!-- COLUMNA IZQUIERDA: PANEL DE EDICIÓN -->
       <v-col cols="12" md="5">
         <v-card class="pa-4" elevation="3">
+          
+          <!-- Botonera Moderna -->
           <v-card-title class="px-0 d-flex align-center justify-space-between flex-wrap gap-2">
             <div class="d-flex align-center">
               <v-icon color="indigo" class="mr-2">mdi-pencil-box-outline</v-icon>
@@ -13,23 +16,10 @@
             </div>
             
             <div class="d-flex gap-2 mt-2 mt-sm-0">
-              <v-btn 
-                color="indigo-darken-1" 
-                variant="tonal"
-                prepend-icon="mdi-open-in-new"
-                density="comfortable"
-                class="text-none mr-2"
-                @click="generatePDF"
-              >
+              <v-btn color="indigo-darken-1" variant="tonal" prepend-icon="mdi-open-in-new" density="comfortable" class="text-none mr-2" @click="generatePDF">
                 Visualizar
               </v-btn>
-              <v-btn 
-                color="indigo" 
-                prepend-icon="mdi-download"
-                density="comfortable"
-                class="text-none"
-                @click="downloadPDF"
-              >
+              <v-btn color="indigo" prepend-icon="mdi-download" density="comfortable" class="text-none" @click="downloadPDF">
                 Descargar PDF
               </v-btn>
             </div>
@@ -38,6 +28,20 @@
           <v-divider class="my-3" />
 
           <v-card-text class="px-0">
+            <!-- ALERTA DE PRIVACIDAD INTEGRADA AL DISEÑO -->
+            <v-alert
+              v-if="cvDat.remaining_days !== undefined"
+              type="info"
+              variant="tonal"
+              class="mb-4"
+              density="compact"
+              prepend-icon="mdi-shield-lock-outline"
+            >
+              Por protección de datos, este CV se eliminará el <strong>{{ formatExpiration(cvDat.expires_at) }}</strong> 
+              (quedan {{ cvDat.remaining_days }} día{{ cvDat.remaining_days === 1 ? '' : 's' }}).
+            </v-alert>
+
+            <!-- PANELES DE EDICIÓN -->
             <v-expansion-panels variant="accordion">
               
               <v-expansion-panel title="Datos Personales">
@@ -79,80 +83,13 @@
                 </v-expansion-panel-text>
               </v-expansion-panel>
 
-        <v-btn
-            v-if = "cvDat"
-            color = "success"
-            @click = "generatePDF"
-            class="mr-2"
-        >
-        Abrir PDF en nueva pestaña
-        </v-btn>
-
-        <v-btn
-            v-if = "cvDat"
-            color = "success"
-            @click = "downloadPDF"
-            class="mr-2"
-        >
-            Descargar CV PDF
-        </v-btn>
-
-        <v-alert
-            v-if="cvDat && cvDat.remaining_days !== undefined"
-            type="info"
-            variant="tonal"
-            class="mt-4"
-            prepend-icon="mdi-shield-lock-outline"
-        >
-            Este CV se eliminará automáticamente por protección de datos
-            el {{ formatExpiration(cvDat.expires_at) }}
-            (quedan {{ cvDat.remaining_days }} día{{ cvDat.remaining_days === 1 ? '' : 's' }}).
-        </v-alert>
-
-        <v-card v-if="cvDat && !loading" class="mt-4">
-            <v-card-title>Vista Previa del CV</v-card-title>
-            <v-card-text>
-                <div class="cv-preview pa-6">
-                    <div class="text-center mb-4">
-                        <h1 class="text-h4 font-weight-bold">{{ cvDat.personal.nombre_completo }}</h1>
-                        <h2 class="text-h6 text-medium-emphasis">{{ cvDat.personal.profesion }}</h2>
-                        <p class="text-caption text-grey">
-                            {{ cvDat.personal.email }} | {{ cvDat.personal.telefono }} | {{ cvDat.personal.ciudad }}
-                        </p>
-                        <p class="text-caption text-grey">
-                            Rut: {{ cvDat.personal.rut }}{{ cvDat.personal.linkedin ? ' | LinkedIn: ' + cvDat.personal.linkedin : '' }}
-                        </p>
-                    </div>
-
-                    <v-divider class="mb-4" />
-
-                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2">Perfil Profesional</h3>
-                    <p class="text-body-2 mb-1">{{ cvDat.perfil.propuesta_valor }}</p>
-                    <p class="text-body-2 mb-1">Años de experiencia: {{ cvDat.perfil.anios_experiencia }}</p>
-                    <p class="text-body-2 mb-4">Experticia: {{ cvDat.perfil.experticia }}</p>
-
-                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2">Experiencia Laboral</h3>
-                    <div v-for="(exp, i) in cvDat.experiencias" :key="i" class="mb-3">
-                        <p class="text-body-2 font-weight-bold mb-0">{{ exp.cargo }} - {{ exp.empresa }}</p>
-                        <p class="text-caption font-italic mb-0">{{ exp.periodo }} | {{ exp.pais }}</p>
-                        <p class="text-body-2 mb-0">Funciones: {{ exp.descripcion }}</p>
-                        <p v-if="exp.logros" class="text-body-2 mb-0">Logros: {{ exp.logros }}</p>
-                    </div>
-
-                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2">Formación Académica</h3>
-                    <p v-for="(form, i) in cvDat.formacion" :key="i" class="text-body-2 mb-1">
-                        {{ form.titulo }} en {{ form.institucion }} ({{ form.periodo }})
-                    </p>
-
-                    <h3 class="text-subtitle-1 font-weight-bold text-decoration-underline mb-2 mt-4">Habilidades</h3>
-                    <p class="text-body-2">{{ cvDat.habilidades }}</p>
-                </div>
-            </v-card-text>
+            </v-expansion-panels>
+          </v-card-text>
         </v-card>
       </v-col>
 
       <!-- COLUMNA DERECHA: LA VISTA PREVIA A4 -->
-        <v-col cols="12" md="7" class="bg-grey-lighten-4 pt-4 pb-8" style="overflow-y: auto; max-height: 88vh;">
+      <v-col cols="12" md="7" class="bg-grey-lighten-4 pt-4 pb-8" style="overflow-y: auto; max-height: 88vh;">
         <div class="a4-preview pa-8 pa-sm-12">
           
           <div class="text-center mb-4">
