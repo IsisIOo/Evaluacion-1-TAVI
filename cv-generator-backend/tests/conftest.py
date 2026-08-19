@@ -6,6 +6,8 @@ from pathlib import Path
 # Fijar variables de entorno ANTES de importar app
 os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production")
 os.environ.setdefault("MONGO_URI", "mongodb://localhost:27017/test_cv_db")
+os.environ.setdefault("GEMINI_API_KEY", "fake-key-for-testing")
+
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
